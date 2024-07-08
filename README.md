@@ -1,4 +1,4 @@
-# Build generative AI agents with Amazon Bedrock, Amazon DynamoDB, Amazon Kendra, Amazon Lex, and LangChain
+# Home, Auto, and Life Insurance AI assistant powered by Amazon Bedrock, Amazon DynamoDB, Amazon Kendra, Amazon Lex, and LangChain
 ---
 
 ## Content
@@ -12,7 +12,7 @@
 ## Overview
 Generative AI agents are capable of producing human-like responses and engaging in natural language conversations by orchestrating a chain of calls to foundation models (FMs) and other augmenting tools based on user input. Instead of only fulfilling pre-defined intents through a static decision tree, agents are autonomous within the context of their suite of available tools. [Amazon Bedrock](https://aws.amazon.com/bedrock/) is a fully managed service that makes leading foundation models from AI companies available through an API along with developer tooling to help build and scale generative AI applications.
 
-This sample solution creates a generative AI financial services agent powered by Amazon Bedrock. The agent can assist users with finding their account information, completing a loan application, or answering natural language questions while also citing sources for the provided answers. This solution is intended to act as a launchpad for developers to create their own personalized conversational agents for various applications, such as chatbots, virtual assistants, and customer support systems.
+This sample solution creates a generative AI insurance agent powered by Amazon Bedrock. The agent can assist users with finding their account information, completing a home, auto, and life insurance quote requests, or answering natural language questions while also citing sources for the provided answers. This solution is intended to act as a launchpad for developers to create their own personalized conversational agents for various applications, such as chatbots, virtual assistants, and customer support systems.
 
 [Amazon Lex](https://docs.aws.amazon.com/lexv2/latest/dg/what-is.html) supplies the natural language understanding (NLU) and natural language processing (NLP) interface for the open source [LangChain conversational agent](https://python.langchain.com/docs/modules/agents/agent_types/chat_conversation_agent) within an [AWS Amplify](https://docs.aws.amazon.com/amplify/latest/userguide/welcome.html) website. The agent is equipped with tools that include an Anthropic Claude 3 Sonnet FM hosted on [Amazon Bedrock](https://aws.amazon.com/bedrock/) and synthetic customer data stored on [Amazon DynamoDB](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html) and [Amazon Kendra](https://docs.aws.amazon.com/kendra/latest/dg/what-is-kendra.html).
 
@@ -20,9 +20,9 @@ This sample solution creates a generative AI financial services agent powered by
 
 [<img src="design/amplify-website.png" width="100%">](https://www.youtube.com/watch?v=CGRw_M0uC4A "Building Generative AI Agents: Amazon Bedrock, Amazon DynamoDB, Amazon Kendra, Amazon Lex, LangChain - YouTube")
 
-- **Provide Personalized Responses** - Query DynamoDB for customer account information, such as mortgage summary details, due balance, and next payment date.
+- **Provide Personalized Responses** - Query DynamoDB for customer account information, such as insurance coverage details, due balance, and next payment date.
 - **Access General Knowledge** - Harness the agent’s reasoning logic in tandem with the vast amounts of data used to pretrain the different FMs provided through Bedrock to produce replies for any customer prompt.
-- **Curate Opinionated Answers** - Inform agent responses using a Kendra Index configured with authoritative data sources: customer documents stored in [Amazon Simple Storage Service](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html) (S3) and [Web Crawler](https://docs.aws.amazon.com/kendra/latest/dg/data-source-web-crawler.html) configured for the customer's website.
+- **Curate Opinionated Answers** - Inform agent responses using a Kendra Index configured with authoritative data sources: customer documents stored in [Amazon Simple Storage Service](https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html) (S3) and [Web Crawler](https://docs.aws.amazon.com/kendra/latest/dg/data-source-web-crawler.html/) configured for the customer's website.
 
 ## Solution Architecture
 
@@ -67,7 +67,7 @@ Action Input: The input to the action
 Observation: The result of the action
 
 Thought: Do I need to use a tool? No
-FSI Agent: [answer and source documents]
+Insurance Agent: [answer and source documents]
 ~~~~
 
 3. As part of the agent's different reasoning paths and self-evaluating choices to decide the next course of action, it has the ability to access customer authoritative data sources using an Amazon Kendra index. Using Kendra, the agent performs a semantic similarity search across a wide range of content types, including documents, FAQs, knowledge bases, manuals, and websites - Please refer to the list of [Kendra supported Data Sources](https://docs.aws.amazon.com/kendra/latest/dg/hiw-data-source.html).
@@ -75,12 +75,11 @@ FSI Agent: [answer and source documents]
    The agent has the power to use this tool to provide opinionated responses to user prompts that should be answered using an authoritative, customer-provided knowledge library, instead of the more general knowledge corpus used to pretrain the Bedrock FM.
 
 **Sample Prompts:** 
-* Why should I use Octank Financial?
+* Why should I choose AnyCompany for insurance?
 * How competitive are their rates?
-* Which type of mortgage should I use?
-* What are current mortgage trends?
-* How much do I need saved for a down payment?
-* What other costs will I pay at closing?
+* What documents do I need to apply for insurance?
+* What factors determine my insurance eligibility?
+* What resources does AnyCompany provide for policy holders?
 
 ## Deployment Guide
 see [Deployment Guide](documentation/deployment-guide.md)

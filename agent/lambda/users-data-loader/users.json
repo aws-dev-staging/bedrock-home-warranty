@@ -1,0 +1,48 @@
+[
+  {
+    "userName": "Home User",
+    "policyId": "101604237",
+    "propertyType": "Home",
+    "propertyValue": 350000,
+    "propertyAddress": {
+      "street": "456 Elm St",
+      "city": "Othertown",
+      "state": "NY",
+      "zip": "54321"
+    },
+    "coverageType": "Home",
+    "deductibleAmount": 1500,
+    "insuredAmount": 400000,
+    "policyStartDate": "2024-06-01",
+    "policyEndDate": "2025-06-01",
+    "ageOfInsured": 40,
+    "insuranceCoverage": "This policy provides comprehensive coverage for the insured home.",
+    "pin": 1234
+  },
+  {
+    "userName": "Auto User",
+    "policyId": "101604238",
+    "vehicleMake": "Toyota",
+    "vehicleModel": "Camry",
+    "vehicleYear": 2020,
+    "coverageType": "Auto",
+    "deductibleAmount": 500,
+    "insuredAmount": 25000,
+    "policyStartDate": "2024-07-01",
+    "policyEndDate": "2025-07-01",
+    "ageOfInsured": 30,
+    "insuranceCoverage": "This policy provides comprehensive coverage for the insured vehicle.",
+    "pin": 1234
+  },
+  {
+    "userName": "Life User",
+    "policyId": "101604239",
+    "coverageType": "Life",
+    "insuredAmount": 500000,
+    "policyStartDate": "2024-08-01",
+    "policyEndDate": "2025-08-01",
+    "ageOfInsured": 45,
+    "insuranceCoverage": "This policy provides life insurance coverage with an insured amount of $500,000.",
+    "pin": 1234
+  }
+]

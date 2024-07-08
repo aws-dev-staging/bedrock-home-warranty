@@ -7,10 +7,25 @@ import cfnresponse
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-user_accounts_table_name = os.environ.get('USER_EXISTING_ACCOUNTS_TABLE')
-REGION = os.environ.get('AWS_REGION')
+users_table_name = os.environ.get('USERS_TABLE_NAME')
+region = os.environ.get('AWS_REGION')
 
-dynamodb = boto3.client('dynamodb', region_name=REGION)
+dynamodb = boto3.client('dynamodb', region_name=region)
+
+def to_dynamodb_attribute(value):
+    if value is None:
+        return {'NULL': True}
+    elif isinstance(value, str):
+        return {'S': value}
+    elif isinstance(value, (int, float)):
+        return {'N': str(value)}
+    elif isinstance(value, dict):
+        nested_attributes = {}
+        for nested_key, nested_value in value.items():
+            nested_attributes[nested_key] = to_dynamodb_attribute(nested_value)
+        return {'M': nested_attributes}
+    else:
+        raise ValueError("Unsupported data type: {}".format(type(value)))
 
 def handler(event, context):
     logger.info("Received event: %s", json.dumps(event))
@@ -18,32 +33,20 @@ def handler(event, context):
     request_type = event.get('RequestType')
     if request_type == 'Create' or request_type == 'Update':
         try:
-            with open('MOCK_DATA.json', 'r') as file:
+            with open('users.json', 'r') as file:
                 claims_data = json.load(file)
             
             items = []
             for claim in claims_data:
                 item = {}
                 for key, value in claim.items():
-                    if value is None:
-                        result = {'S': ''}
-                    elif isinstance(value, str):
-                        result = {'S': value}
-                    elif isinstance(value, (int, float)):
-                        result = {'N': str(value)}
-                    elif isinstance(value, dict):
-                        nested_attributes = {}
-                        for nested_key, nested_value in value.items():
-                            nested_attributes[nested_key] = to_dynamodb_attribute(nested_value)
-                        result = {'M': nested_attributes}
-
-                    item[key] = result
+                    item[key] = to_dynamodb_attribute(value)
 
                 items.append({'PutRequest': {'Item': item}})
             
             response = dynamodb.batch_write_item(
                 RequestItems={
-                    user_accounts_table_name: items
+                    users_table_name: items
                 }
             )
             

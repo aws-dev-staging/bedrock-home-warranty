@@ -17,7 +17,7 @@ conversation_table_name = os.environ.get('CONVERSATION_TABLE')
 class Chat():
 
     def __init__(self, event, session_id):
-        print(f"Initializing FSI Agent chat with session ID: {session_id}")
+        print(f"Initializing Insurance Agent chat with session ID: {session_id}")
         self.set_user_id(event)
         self.set_session_id(session_id)
         self.set_chat_index()

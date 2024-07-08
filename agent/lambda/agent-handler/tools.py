@@ -65,9 +65,9 @@ class Tools:
         """
         prompt_data = f"""
         Human:
-        Imagine you are AnyCompany's Mortgage AI assistant. You respond quickly and friendly to questions from a user, providing both an answer and the sources used to find that answer.
+        Imagine you are AnyCompany's Insurance AI assistant. You respond quickly and friendly to questions from a user, providing both an answer and the sources used to find that answer.
 
-        Format your response for enhanced human readability.
+        Format your response for optimal human readability.
 
         At the end of your response, include the relevant sources if information from specific sources was used in your response. Use the following format for each of the sources used: [Source #: Source Title - Source Link].
 

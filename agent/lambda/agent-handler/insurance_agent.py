@@ -4,7 +4,7 @@ from langchain.agents import AgentExecutor
 from tools import Tools
 from datetime import datetime
 
-class FSIAgent:
+class InsuranceAgent:
     
     def __init__(self, llm, memory) -> None:
         self.ai_prefix = "Assistant"
@@ -18,7 +18,7 @@ class FSIAgent:
         # Initialize the agent with only the AnyCompany tool
         anycompany_tool = Tool(name="AnyCompany", func=self.tools_instance.kendra_search, description="Use this tool to answer questions about AnyCompany.")
         
-        fsi_agent = ConversationalAgent.from_llm_and_tools(
+        insurance_agent = ConversationalAgent.from_llm_and_tools(
             llm=self.llm,
             tools=[anycompany_tool],
             ai_prefix=self.ai_prefix,
@@ -29,7 +29,7 @@ class FSIAgent:
         )
 
         agent_executor = AgentExecutor.from_agent_and_tools(
-            agent=fsi_agent,
+            agent=insurance_agent,
             tools=[anycompany_tool],
             verbose=True,
             memory=self.memory,
@@ -40,7 +40,7 @@ class FSIAgent:
         return agent_executor
 
     def run(self, input):
-        print("Running FSI Agent with input: " + str(input))
+        print("Running Insurance Agent with input: " + str(input))
         try:
             response = self.tools_instance.kendra_search(input)
         except ValueError as e:

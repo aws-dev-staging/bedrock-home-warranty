@@ -23,7 +23,8 @@ Metadata:
           default: S3 Bucket, Lambda and Lex Deployment Package Keys, and Lambda Layer ARNs
         Parameters:
           - S3ArtifactBucket
-          - DataLoaderS3Key
+          - UsersDataLoaderS3Key
+          - ClaimsDataLoaderS3Key
           - LambdaHandlerS3Key
           - LexBotS3Key
           - BedrockLangChainPDFRWLayerArn
@@ -43,8 +44,10 @@ Metadata:
     ParameterLabels:
       S3ArtifactBucket:
         default: your-s3-bucket-name
-      DataLoaderS3Key:
-        default: /agent/lambda/data-loader/loader_deployment_package.zip
+      UsersDataLoaderS3Key:
+        default: /agent/lambda/data-loader/users_loader_deployment_package.zip
+      ClaimsDataLoaderS3Key:
+        default: /agent/lambda/data-loader/claims_loader_deployment_package.zip
       LambdaHandlerS3Key:
         default: /agent/lambda/agent-handler/agent_deployment_package.zip
       LexBotS3Key:
@@ -65,10 +68,14 @@ Parameters:
     Description: S3 Bucket Containing Lambda Handler, Lambda Data Loader, and Lex Deployment Packages, along with Customer FAQ and Mortgage Application example documents.
     Type: String
     Default: your-s3-bucket-name
-  DataLoaderS3Key:
-    Description: S3 Key for DynamoDB data loader.
+  UsersDataLoaderS3Key:
+    Description: S3 Key for DynamoDB users data loader.
     Type: String
-    Default: /agent/lambda/data-loader/loader_deployment_package.zip
+    Default: /agent/lambda/data-loader/users_loader_deployment_package.zip
+  ClaimsDataLoaderS3Key:
+    Description: S3 Key for DynamoDB claims data loader.
+    Type: String
+    Default: /agent/lambda/data-loader/claims_loader_deployment_package.zip
   LambdaHandlerS3Key:
     Description: S3 Key for Lambda handler.
     Type: String
@@ -100,43 +107,73 @@ Parameters:
     Default: your-forked-repo-url
 
 Resources:
-  UserPendingAccountsTable:
+  UsersTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub ${AWS::StackName}-UserPendingAccounts
+      TableName: !Sub ${AWS::StackName}-UsersTable
       AttributeDefinitions:
-      - AttributeName: userName
+        - AttributeName: userName
+          AttributeType: S
+        - AttributeName: policyId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userName
+          KeyType: HASH
+        - AttributeName: policyId
+          KeyType: RANGE 
+      ProvisionedThroughput:
+        ReadCapacityUnits: 3
+        WriteCapacityUnits: 3
+      SSESpecification:
+        SSEEnabled: True
+      GlobalSecondaryIndexes:
+        - IndexName: PolicyIdIndex
+          KeySchema:
+            - AttributeName: policyId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 3
+            WriteCapacityUnits: 3
+
+  ClaimsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-ClaimsTable
+      AttributeDefinitions:
+      - AttributeName: claimId
         AttributeType: S
-      - AttributeName: planName
+      - AttributeName: policyId
         AttributeType: S
       KeySchema:
-      - AttributeName: userName
+      - AttributeName: claimId
         KeyType: HASH
-      - AttributeName: planName
+      - AttributeName: policyId
         KeyType: RANGE
       ProvisionedThroughput:
-        ReadCapacityUnits: '3'
-        WriteCapacityUnits: '3'
+        ReadCapacityUnits: 3
+        WriteCapacityUnits: 3
       SSESpecification:
         SSEEnabled: True
 
-  UserExistingAccountsTable:
+  InsuranceQuoteRequestsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub ${AWS::StackName}-UserExistingAccounts
+      TableName: !Sub ${AWS::StackName}-InsuranceQuoteRequests
       AttributeDefinitions:
-      - AttributeName: userName
+      - AttributeName: UserName
         AttributeType: S
-      - AttributeName: planName
-        AttributeType: S
+      - AttributeName: RequestTimestamp
+        AttributeType: N
       KeySchema:
-      - AttributeName: userName
+      - AttributeName: UserName
         KeyType: HASH
-      - AttributeName: planName
+      - AttributeName: RequestTimestamp
         KeyType: RANGE
       ProvisionedThroughput:
-        ReadCapacityUnits: '3'
-        WriteCapacityUnits: '3'
+        ReadCapacityUnits: 3
+        WriteCapacityUnits: 3
       SSESpecification:
         SSEEnabled: True
 
@@ -145,11 +182,11 @@ Resources:
     Properties:
       TableName: !Sub ${AWS::StackName}-ConversationIndexTable
       KeySchema:
-        - AttributeName: id
-          KeyType: HASH
+      - AttributeName: id
+        KeyType: HASH
       AttributeDefinitions:
-        - AttributeName: id
-          AttributeType: S
+      - AttributeName: id
+        AttributeType: S
       BillingMode: PAY_PER_REQUEST
       SSESpecification:
         SSEEnabled: True
@@ -159,11 +196,11 @@ Resources:
     Properties:
       TableName: !Sub ${AWS::StackName}-ConversationTable
       KeySchema:
-        - AttributeName: SessionId
-          KeyType: HASH
+      - AttributeName: SessionId
+        KeyType: HASH
       AttributeDefinitions:
-        - AttributeName: SessionId
-          AttributeType: S
+      - AttributeName: SessionId
+        AttributeType: S
       BillingMode: PAY_PER_REQUEST
       SSESpecification:
         SSEEnabled: True
@@ -221,7 +258,7 @@ Resources:
   AgentHandlerFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Description: Lambda handler for GenAI FSI Agent.
+      Description: Lambda handler for GenAI Insurance Agent.
       FunctionName: !Sub ${AWS::StackName}-GenAILexHandler
       Code:
         S3Bucket: !Ref S3ArtifactBucket
@@ -237,8 +274,9 @@ Resources:
         - x86_64
       Environment:
         Variables:
-          USER_PENDING_ACCOUNTS_TABLE: !Ref UserPendingAccountsTable
-          USER_EXISTING_ACCOUNTS_TABLE: !Ref UserExistingAccountsTable
+          USERS_TABLE_NAME: !Ref UsersTable
+          CLAIMS_TABLE_NAME: !Ref ClaimsTable
+          INSURACE_QUOTE_REQUESTS_TABLE_NAME: !Ref InsuranceQuoteRequestsTable
           CONVERSATION_INDEX_TABLE: !Ref ConversationIndexTable
           CONVERSATION_TABLE: !Ref ConversationTable
           KENDRA_INDEX_ID: !GetAtt KendraIndex.Id
@@ -251,14 +289,14 @@ Resources:
       FunctionName: !Ref AgentHandlerFunction
       Principal: 'lexv2.amazonaws.com'
 
-  DataLoaderFunction:
+  UsersDataLoaderFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Description: Lambda function to load the plan catalog.
-      FunctionName: !Sub ${AWS::StackName}-DDBDataLoader
+      Description: Lambda function to load the users data.
+      FunctionName: !Sub ${AWS::StackName}-DDB-UsersDataLoader
       Code: 
         S3Bucket: !Ref S3ArtifactBucket
-        S3Key: !Ref DataLoaderS3Key
+        S3Key: !Ref UsersDataLoaderS3Key
       Runtime: python3.11
       MemorySize: 256
       Timeout: 20
@@ -268,12 +306,36 @@ Resources:
       Role: !GetAtt AgentHandlerServiceRole.Arn
       Environment:
         Variables:
-          USER_EXISTING_ACCOUNTS_TABLE: !Ref UserExistingAccountsTable
+          USERS_TABLE_NAME: !Ref UsersTable
 
-  LoadPlanData:
+  LoadUsersData:
     Type: Custom::LoadDynamoDB
     Properties:
-      ServiceToken: !GetAtt DataLoaderFunction.Arn
+      ServiceToken: !GetAtt UsersDataLoaderFunction.Arn
+
+  ClaimsDataLoaderFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Lambda function to load the claims data.
+      FunctionName: !Sub ${AWS::StackName}-DDB-ClaimsDataLoader
+      Code: 
+        S3Bucket: !Ref S3ArtifactBucket
+        S3Key: !Ref ClaimsDataLoaderS3Key
+      Runtime: python3.11
+      MemorySize: 256
+      Timeout: 20
+      Handler: index.handler
+      Layers:
+        - !Ref CfnresponseLayerArn
+      Role: !GetAtt AgentHandlerServiceRole.Arn
+      Environment:
+        Variables:
+          CLAIMS_TABLE_NAME: !Ref ClaimsTable
+
+  LoadClaimsData:
+    Type: Custom::LoadDynamoDB
+    Properties:
+      ServiceToken: !GetAtt ClaimsDataLoaderFunction.Arn
 
   AmplifyRole:
     Type: AWS::IAM::Role
@@ -470,7 +532,7 @@ Resources:
     DependsOn: LexBotRole
     Type: AWS::Lex::Bot
     Properties:
-        Name: !Sub ${AWS::StackName}-FSI-Agent
+        Name: !Sub ${AWS::StackName}-Insurance-Agent
         BotFileS3Location: 
           S3Bucket: !Ref S3ArtifactBucket
           S3ObjectKey: !Ref LexBotS3Key
