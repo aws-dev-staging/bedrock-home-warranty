@@ -1,98 +1,97 @@
 [
   {
-    "claimId": "9x87y-3z",
-    "policyId": "101604238",
-    "claimType": "Auto",
-    "email": "example@amazon.com",
-    "claimDatetime": "2016-11-22 15:21:00",
-    "incident": {
-      "date": "06-08-2016",
-      "hour": 20,
-      "type": "Single Vehicle Collision",
-      "severity": "Trivial Damage"
+    "ClaimId": "9x87y-3z",
+    "PolicyId": "HW101604238",
+    "ClaimType": "Appliance Repair",
+    "Email": "example@amazon.com",
+    "ClaimDatetime": "2023-11-22 15:21:00",
+    "Incident": {
+      "Date": "2023-11-21",
+      "Hour": 14,
+      "Type": "Dishwasher Breakdown",
+      "Severity": "Major"
     },
-    "collision": {
-      "type": "Side Collision",
-      "numberVehiclesInvolved": 1
+    "Damage": {
+      "Type": "Mechanical Failure",
+      "Description": "The dishwasher stopped working and is not draining water."
     },
-    "driver": {
-      "age": 65.0,
-      "insuredRelationship": "primary",
-      "licenseIssueDate": "01-12-1975"
+    "Homeowner": {
+      "Age": 65,
+      "InsuredRelationship": "primary",
+      "OwnershipYears": 20
     },
-    "claimAmount": {
-      "total": 62590,
-      "injury": 11380,
-      "property": 11380,
-      "vehicle": 39830
+    "ClaimAmount": {
+      "Total": 400,
+      "RepairCost": 350,
+      "ServiceFee": 50
     },
-    "numberWitnesses": 1,
-    "suspiciousActivity": false,
-    "monthsAsCustomer": 276,
-    "status": "Closed"
+    "NumberWitnesses": 0,
+    "SuspiciousActivity": false,
+    "MonthsAsCustomer": 60,
+    "Status": "Closed"
   },
   {
-    "claimId": "5t16u-7v",
-    "policyId": "101604237",
-    "claimType": "Home",
-    "email": "example@amazon.com",
-    "claimDatetime": "2016-11-30 14:15:00",
-    "incident": {
-      "date": "17-11-2016",
-      "hour": 19,
-      "type": "House Fire",
-      "severity": "Major Damage"
+    "ClaimId": "5t16u-7v",
+    "PolicyId": "HW101604237",
+    "ClaimType": "System Repair",
+    "Email": "example@amazon.com",
+    "ClaimDatetime": "2023-11-30 14:15:00",
+    "Incident": {
+      "Date": "2023-11-29",
+      "Hour": 10,
+      "Type": "HVAC Failure",
+      "Severity": "Severe"
     },
-    "damage": {
-      "type": "Structural",
-      "description": "Fire damaged the roof and walls of the house."
+    "Damage": {
+      "Type": "System Malfunction",
+      "Description": "The HVAC system stopped heating the house."
     },
-    "homeowner": {
-      "age": 45.0,
-      "insuredRelationship": "primary",
-      "ownershipYears": 10
+    "Homeowner": {
+      "Age": 45,
+      "InsuredRelationship": "primary",
+      "OwnershipYears": 10
     },
-    "claimAmount": {
-      "total": 2650,
-      "structure": 2000,
-      "contents": 250,
-      "additionalLivingExpenses": 400
+    "ClaimAmount": {
+      "Total": 1200,
+      "TepairCost": 1150,
+      "TerviceFee": 50
     },
-    "numberWitnesses": 2,
-    "suspiciousActivity": false,
-    "monthsAsCustomer": 65,
-    "status": "Open",
-    "pendingDocuments": ["Fire Department Report", "Inventory of Damaged Items"]
+    "NumberWitnesses": 0,
+    "SuspiciousActivity": false,
+    "MonthsAsCustomer": 65,
+    "Status": "Open",
+    "PendingDocuments": ["HVAC Technician Report", "Invoice"]
   },
   {
-    "claimId": "2s34w-8x",
-    "policyId": "101604239",
-    "claimType": "Life",
-    "email": "example@amazon.com",
-    "claimDatetime": "2016-11-27 11:07:00",
-    "incident": {
-      "date": "07-06-2016",
-      "type": "Accidental Death",
-      "cause": "Car accident"
+    "ClaimId": "2s34w-8x",
+    "PolicyId": "HW101604239",
+    "ClaimType": "Appliance Replacement",
+    "Email": "example@amazon.com",
+    "ClaimDatetime": "2023-11-27 11:07:00",
+    "Incident": {
+      "Date": "2023-11-25",
+      "Hour": 9,
+      "Type": "Refrigerator Breakdown",
+      "Severity": "Critical"
     },
-    "deceased": {
-      "age": 44,
-      "relationship": "spouse",
-      "occupation": "Engineer"
+    "Damage": {
+      "Type": "Total Breakdown",
+      "Description": "The refrigerator stopped cooling and cannot be repaired."
     },
-    "beneficiary": {
-      "name": "John Doe",
-      "relationship": "spouse",
-      "age": 42
+    "Homeowner": {
+      "Age": 44,
+      "InsuredRelationship": "spouse",
+      "OwnershipYears": 5
     },
-    "claimAmount": {
-      "total": 770000,
-      "deathBenefit": 770000
+    "ClaimAmount": {
+      "Total": 1500,
+      "ReplacementCost": 1450,
+      "ServiceFee": 50
     },
-    "numberWitnesses": 1,
-    "suspiciousActivity": false,
-    "monthsAsCustomer": 144,
-    "status": "Open",
-    "pendingDocuments": ["Death Certificate", "Police Report"]
+    "NumberWitnesses": 0,
+    "SuspiciousActivity": false,
+    "MonthsAsCustomer": 36,
+    "Status": "Open",
+    "PendingDocuments": ["Technician Diagnosis Report", "Proof of Purchase for Replacement"]
   }
 ]

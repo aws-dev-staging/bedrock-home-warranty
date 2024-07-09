@@ -17,7 +17,7 @@ conversation_table_name = os.environ.get('CONVERSATION_TABLE')
 class Chat():
 
     def __init__(self, event, session_id):
-        print(f"Initializing Insurance Agent chat with session ID: {session_id}")
+        print(f"Initializing Home Warranty Agent chat with session ID: {session_id}")
         self.set_user_id(event)
         self.set_session_id(session_id)
         self.set_chat_index()
@@ -40,10 +40,10 @@ class Chat():
         # Set up conversation memory
         self.memory = ConversationBufferMemory(
             ai_prefix="Assistant",
-            memory_key="chat_history",
+            memory_key="ChatHistory",
             chat_memory=self.message_history,
-            input_key="input",
-            output_key="output",
+            input_key="Input",
+            output_key="Output",
             return_messages=True
         )
 
@@ -57,9 +57,9 @@ class Chat():
     def increment_chat_index(self):
         self.chat_index += 1
         input = {
-            'id': self.user_id,
-            'chat_index': self.chat_index,
-            'updated_at': str(now)
+            'Id': self.user_id,
+            'ChatIndex': self.chat_index,
+            'UpdatedAt': str(now)
         }
         dynamodb.put_item(TableName=conversation_index_table_name, Item=ts.serialize(input)['M'])
 

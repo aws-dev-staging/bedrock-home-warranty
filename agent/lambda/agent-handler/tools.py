@@ -12,9 +12,9 @@ class Tools:
         print("Initializing Tools")
         self.tools = [
             Tool(
-                name="AnyCompany",
+                name="HomeWarranty",
                 func=self.kendra_search,
-                description="Use this tool to answer questions about AnyCompany.",
+                description="Use this tool to answer questions about First American Home Warranty.",
             )
         ]
 
@@ -65,9 +65,9 @@ class Tools:
         """
         prompt_data = f"""
         Human:
-        Imagine you are AnyCompany's Insurance AI assistant. You respond quickly and friendly to questions from a user, providing both an answer and the sources used to find that answer.
+        Imagine you are First American Home Warranty's AI assistant. You respond quickly and friendly to questions from a user, providing both an answer and the sources used to find that answer.
 
-        Format your response for optimal human readability.
+        Format your response for optimal human readability and do not reference the context,
 
         At the end of your response, include the relevant sources if information from specific sources was used in your response. Use the following format for each of the sources used: [Source #: Source Title - Source Link].
 

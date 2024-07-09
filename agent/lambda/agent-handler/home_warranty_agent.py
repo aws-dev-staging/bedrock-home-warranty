@@ -4,7 +4,7 @@ from langchain.agents import AgentExecutor
 from tools import Tools
 from datetime import datetime
 
-class InsuranceAgent:
+class HomeWarrantyAgent:
     
     def __init__(self, llm, memory) -> None:
         self.ai_prefix = "Assistant"
@@ -16,11 +16,11 @@ class InsuranceAgent:
 
     def create_agent(self):
         # Initialize the agent with only the AnyCompany tool
-        anycompany_tool = Tool(name="AnyCompany", func=self.tools_instance.kendra_search, description="Use this tool to answer questions about AnyCompany.")
+        home_warranty_tool = Tool(name="HomeWarranty", func=self.tools_instance.kendra_search, description="Use this tool to answer questions about First American Home Warranty.")
         
-        insurance_agent = ConversationalAgent.from_llm_and_tools(
+        home_warranty_agent = ConversationalAgent.from_llm_and_tools(
             llm=self.llm,
-            tools=[anycompany_tool],
+            tools=[home_warranty_tool],
             ai_prefix=self.ai_prefix,
             human_prefix=self.human_prefix,
             verbose=True,
@@ -29,8 +29,8 @@ class InsuranceAgent:
         )
 
         agent_executor = AgentExecutor.from_agent_and_tools(
-            agent=insurance_agent,
-            tools=[anycompany_tool],
+            agent=home_warranty_agent,
+            tools=[home_warranty_tool],
             verbose=True,
             memory=self.memory,
             return_source_documents=True,
@@ -40,7 +40,7 @@ class InsuranceAgent:
         return agent_executor
 
     def run(self, input):
-        print("Running Insurance Agent with input: " + str(input))
+        print("Running Home Warranty Agent with input: " + str(input))
         try:
             response = self.tools_instance.kendra_search(input)
         except ValueError as e:

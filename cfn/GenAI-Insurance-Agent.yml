@@ -112,14 +112,14 @@ Resources:
     Properties:
       TableName: !Sub ${AWS::StackName}-UsersTable
       AttributeDefinitions:
-        - AttributeName: userName
+        - AttributeName: UserName
           AttributeType: S
-        - AttributeName: policyId
+        - AttributeName: PolicyId
           AttributeType: S
       KeySchema:
-        - AttributeName: userName
+        - AttributeName: UserName
           KeyType: HASH
-        - AttributeName: policyId
+        - AttributeName: PolicyId
           KeyType: RANGE 
       ProvisionedThroughput:
         ReadCapacityUnits: 3
@@ -142,14 +142,14 @@ Resources:
     Properties:
       TableName: !Sub ${AWS::StackName}-ClaimsTable
       AttributeDefinitions:
-      - AttributeName: claimId
+      - AttributeName: ClaimId
         AttributeType: S
-      - AttributeName: policyId
+      - AttributeName: PolicyId
         AttributeType: S
       KeySchema:
-      - AttributeName: claimId
+      - AttributeName: ClaimId
         KeyType: HASH
-      - AttributeName: policyId
+      - AttributeName: PolicyId
         KeyType: RANGE
       ProvisionedThroughput:
         ReadCapacityUnits: 3
@@ -182,10 +182,10 @@ Resources:
     Properties:
       TableName: !Sub ${AWS::StackName}-ConversationIndexTable
       KeySchema:
-      - AttributeName: id
+      - AttributeName: Id
         KeyType: HASH
       AttributeDefinitions:
-      - AttributeName: id
+      - AttributeName: Id
         AttributeType: S
       BillingMode: PAY_PER_REQUEST
       SSESpecification:

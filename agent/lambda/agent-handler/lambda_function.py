@@ -10,7 +10,7 @@ import datetime
 import dateutil.parser
 
 from chat import Chat
-from insurance_agent import InsuranceAgent
+from home_warranty_agent import HomeWarrantyAgent
 from boto3.dynamodb.conditions import Key
 from langchain.llms.bedrock import Bedrock
 from langchain.chains import ConversationChain
@@ -18,7 +18,7 @@ from langchain.chains import ConversationChain
 # Create reference to DynamoDB tables and S3 bucket
 users_table_name = os.environ['USERS_TABLE_NAME']
 claims_table_name = os.environ['CLAIMS_TABLE_NAME']
-insurance_quote_requests_table_name = os.environ['INSURACE_QUOTE_REQUESTS_TABLE_NAME']
+home_warranty_quote_requests_table_name = os.environ['INSURACE_QUOTE_REQUESTS_TABLE_NAME']
 s3_artifact_bucket = os.environ['S3_ARTIFACT_BUCKET_NAME']
 
 # Instantiate boto3 clients and resources
@@ -201,7 +201,7 @@ def try_ex(value):
         return value['value'].get('interpretedValue') or value['value'].get('originalValue')
     return None
 
-def get_user_by_policy_id(policyId):
+def get_user_by_policy_id(policy_id):
     """
     Retrieves user information based on the provided policyId using a GSI.
     """
@@ -211,9 +211,9 @@ def get_user_by_policy_id(policyId):
         # Set up the query parameters for the GSI
         params = {
             'IndexName': 'PolicyIdIndex',
-            'KeyConditionExpression': 'policyId = :pid',
+            'KeyConditionExpression': 'PolicyId = :pid',
             'ExpressionAttributeValues': {
-                ':pid': policyId
+                ':pid': policy_id
             }
         }
 
@@ -242,7 +242,7 @@ def isvalid_pin(username, pin):
     try:
         # Query the table using the partition key
         response = users_table.query(
-            KeyConditionExpression=Key('userName').eq(username)
+            KeyConditionExpression=Key('UserName').eq(username)
         )
 
         # Iterate over the items returned in the response
@@ -268,7 +268,7 @@ def isvalid_username(username):
     try:
         # Set up the query parameters
         params = {
-            'KeyConditionExpression': 'userName = :c',
+            'KeyConditionExpression': 'UserName = :c',
             'ExpressionAttributeValues': {
                 ':c': username
             }
@@ -364,27 +364,65 @@ def verify_identity(intent_request):
             try:
                 # Query the table using the partition key
                 response = users_table.query(
-                    KeyConditionExpression=Key('userName').eq(username)
+                    KeyConditionExpression=Key('UserName').eq(username)
                 )
 
-                # Customize message based on coverage type
-                message = ""
+                # Customize message based on home warranty details
+                message_parts = []
                 items = response['Items']
                 for item in items:
-                    coverage_type = item.get('coverageType', None)
-                    if coverage_type == 'Home':
-                        message += f"Your home insurance policy provides comprehensive coverage for your property located at {item['propertyAddress']['street']} in {item['propertyAddress']['city']}, {item['propertyAddress']['state']} {item['propertyAddress']['zip']}. "
-                        message += f"The policy started on {item['policyStartDate']} and ends on {item['policyEndDate']}. "
-                        message += f"Your deductible amount is ${item['deductibleAmount']:,}."
-                    elif coverage_type == 'Auto':
-                        message += f"Your auto insurance policy covers your {item['vehicleMake']} {item['vehicleModel']} {item['vehicleYear']} with comprehensive coverage. "
-                        message += f"The policy started on {item['policyStartDate']} and ends on {item['policyEndDate']}. "
-                        message += f"Your insured amount is ${item['insuredAmount']:,}."
-                    elif coverage_type == 'Life':
-                        message += f"Your life insurance policy provides coverage for you with an insured amount of ${item['insuredAmount']:,}. "
-                        message += f"The policy started on {item['policyStartDate']} and ends on {item['policyEndDate']}."
+                    policy_id = item.get('PolicyId')
+                    property_type = item.get('PropertyType')
+                    property_value = item.get('PropertyValue')
+                    property_address = item.get('PropertyAddress', {})
+                    coverage_type = item.get('CoverageType')
+                    covered_items = item.get('CoveredItems', [])
+                    deductible_amount = item.get('DeductibleAmount')
+                    policy_start_date = item.get('PolicyStartDate')
+                    policy_end_date = item.get('PolicyEndDate')
+                    service_fee = item.get('ServiceFee')
+                    coverage_description = item.get('CoverageDescription', '')
 
-                return elicit_intent(intent_request, session_attributes, 
+                    if policy_id:
+                        build_slot(intent_request, 'PolicyId', policy_id)
+                        message_parts.append(f"Your home warranty policy ID is {policy_id}.")
+                    if property_type and property_value:
+                        build_slot(intent_request, 'PropertyType', property_type)
+                        build_slot(intent_request, 'PropertyValue', property_value)
+                        message_parts.append(f"It covers a {property_type} valued at ${property_value:,}.")
+                    if property_address:
+                        address = ', '.join(filter(None, [
+                            property_address.get('street', ''),
+                            property_address.get('city', ''),
+                            property_address.get('state', ''),
+                            property_address.get('zip', '')
+                        ]))
+                        if address:
+                            build_slot(intent_request, 'PropertyAddress', address)
+                            message_parts.append(f"Located at {address}.")
+                    if coverage_type and covered_items:
+                        build_slot(intent_request, 'CoverageType', coverage_type)
+                        build_slot(intent_request, 'CoveredItems', covered_items)
+                        message_parts.append(f"You have a {coverage_type} which includes coverage for {', '.join(covered_items)}.")
+                    if policy_start_date and policy_end_date:
+                        build_slot(intent_request, 'PolicyStartDate', policy_start_date)
+                        build_slot(intent_request, 'PolicyEndDate', policy_end_date)
+                        message_parts.append(f"The policy started on {policy_start_date} and ends on {policy_end_date}.")
+                    if deductible_amount:
+                        build_slot(intent_request, 'DeductibleAmount', deductible_amount)
+                        message_parts.append(f"Your deductible amount is ${deductible_amount:,}.")
+                    if service_fee:
+                        build_slot(intent_request, 'ServiceFee', service_fee)
+                        message_parts.append(f"The service fee is ${service_fee:,}.")
+                    if coverage_description:
+                        build_slot(intent_request, 'CoverageDescription', coverage_description)
+                        message_parts.append(coverage_description)
+
+                message = ' '.join(message_parts)
+
+                return elicit_intent(
+                    intent_request,
+                    session_attributes,
                     f'Thank you for confirming your username and PIN, {username}. {message}'
                 )
 
@@ -393,10 +431,200 @@ def verify_identity(intent_request):
                 return e
 
 
-def validate_home_insurance(intent_request, session_id, home_coverage, home_type, property_value, year_built, square_footage, home_security_system):
+def validate_home_warranty_quote(intent_request, slots):
     """
-    Validates slot values specific to Home insurance.
+    Validates slot values specific to Home Warranty insurance.
     """
+    confirmation_status = intent_request['sessionState']['intent']['confirmationState']
+    session_attributes = intent_request['sessionState'].get("sessionAttributes") or {}
+    session_id = intent_request['sessionId']
+
+    # Change these slot keys to be more meaningful for the home warranty use case
+    username = try_ex(slots['UserName'])
+    policy_type = try_ex(slots['PolicyType'])
+    policy_start_date = try_ex(slots['PolicyStartDate'])
+    home_coverage = try_ex(slots['HomeCoverage'])
+    home_type = try_ex(slots['HomeType'])
+    property_value = try_ex(slots['PropertyValue'])
+    year_built = try_ex(slots['YearBuilt'])
+    square_footage = try_ex(slots['SquareFootage'])
+    home_security_system = try_ex(slots['HomeSecuritySystem'])
+
+    if username is not None:
+        if not isvalid_username(username):
+            return build_validation_result(
+                False,
+                'UserName',
+                'Our records indicate there is no profile belonging to the username, {}. Please enter a valid username'.format(username)
+            )
+    else:
+        try:
+            session_username = intent_request['sessionState']['sessionAttributes']['UserName']
+            build_slot(intent_request, 'UserName', session_username)
+        except KeyError:
+            return build_validation_result(
+                False,
+                'UserName',
+                'You have been logged out. Please start a new session.'
+            )
+
+    # Property Information
+
+    if property_address is None:
+        if not isvalid_username(username):
+            return build_validation_result(
+                False,
+                'UserName',
+                'Our records indicate there is no profile belonging to the username, {}. Please enter a valid username'.format(username)
+            )
+    else:
+        try:
+            session_username = intent_request['sessionState']['sessionAttributes']['UserName']
+            build_slot(intent_request, 'UserName', session_username)
+        except KeyError:
+            return build_validation_result(
+                False,
+                'UserName',
+                'You have been logged out. Please start a new session.'
+            )
+
+        return build_validation_result(
+            False,
+            'PropertyAddress',
+            'What is the address of the property you want to insure?'
+        )
+
+    if property_type is None:
+        return build_validation_result(
+            False,
+            'PropertyType',
+            'Is this property your primary residence, a rental property, or a vacation home?'
+        )
+
+    if property_size is not None and not isvalid_number(property_size):
+        return build_validation_result(
+            False,
+            'PropertySize',
+            'Please enter a valid number for the property size.'
+        )
+
+    if stories is not None and not isvalid_number(stories):
+        return build_validation_result(
+            False,
+            'Stories',
+            'Please enter a valid number for the number of stories.'
+        )
+
+    if bedrooms is not None and not isvalid_number(bedrooms):
+        return build_validation_result(
+            False,
+            'Bedrooms',
+            'Please enter a valid number for the number of bedrooms.'
+        )
+
+    if bathrooms is not None and not isvalid_number(bathrooms):
+        return build_validation_result(
+            False,
+            'Bathrooms',
+            'Please enter a valid number for the number of bathrooms.'
+        )
+
+
+    # Property Age and Condition
+
+    if year_built is not None and not isvalid_date(year_built):
+        return build_validation_result(
+            False,
+            'YearBuilt',
+            'Please enter a valid year for when the property was built.'
+        )
+
+
+    # System and Appliance Information
+
+    valid_heating_systems = ['furnace', 'boiler', 'heat pump']
+    if heating_system is not None and heating_system.lower() not in valid_heating_systems:
+        return build_validation_result(
+            False,
+            'HeatingSystem',
+            f'Please specify a valid heating system type: {", ".join(valid_heating_systems)}.'
+        )
+
+    valid_cooling_systems = ['central AC', 'window units']
+    if cooling_system is not None and cooling_system.lower() not in valid_cooling_systems:
+        return build_validation_result(
+            False,
+            'CoolingSystem',
+            f'Please specify a valid cooling system type: {", ".join(valid_cooling_systems)}.'
+        )
+
+
+    # Warranty Coverage Preferences
+
+    valid_coverage_levels = ['basic', 'standard', 'comprehensive']
+    if coverage_level is not None and coverage_level.lower() not in valid_coverage_levels:
+        return build_validation_result(
+            False,
+            'CoverageLevel',
+            f'Please specify a valid coverage level: {", ".join(valid_coverage_levels)}.'
+        )
+
+
+    # Additional Coverage Options
+
+    if additional_coverage is not None:
+        valid_additional_coverage_options = ['pool', 'spa', 'well pump']
+        for item in additional_coverage:
+            if item.lower() not in valid_additional_coverage_options:
+                return build_validation_result(
+                    False,
+                    'AdditionalCoverage',
+                    f'Please specify valid additional coverage options: {", ".join(valid_additional_coverage_options)}.'
+                )
+
+
+    # Service and Usage Information
+
+    if property_usage is not None:
+        valid_property_usage_options = ['primary residence', 'rental property', 'vacation home']
+        if property_usage.lower() not in valid_property_usage_options:
+            return build_validation_result(
+                False,
+                'PropertyUsage',
+                f'Please specify a valid property usage type: {", ".join(valid_property_usage_options)}.'
+            )
+
+    if past_claims is not None:
+        if not isvalid_number(past_claims):
+            return build_validation_result(
+                False,
+                'PastClaims',
+                'Please enter a valid number for the past claims on this property.'
+            )
+
+
+    # Discount and Membership Information
+
+    if homeowner_association_member is not None:
+        valid_membership_options = ['yes', 'no']
+        if homeowner_association_member.lower() not in valid_membership_options:
+            return build_validation_result(
+                False,
+                'HomeownerAssociationMember',
+                'Please specify if you are a member of homeowner associations with "Yes" or "No".'
+            )
+
+    if other_insurance_policies is not None:
+        valid_insurance_options = ['yes', 'no']
+        if other_insurance_policies.lower() not in valid_insurance_options:
+            return build_validation_result(
+                False,
+                'OtherInsurancePolicies',
+                'Please specify if you have other insurance policies with us with "Yes" or "No".'
+            )
+
+    ###
+
     if home_coverage is not None:
         home_coverage_list = ['structure', 'contents', 'liability', 'all']
         if not isvalid_slot_value(home_coverage, home_coverage_list):
@@ -478,228 +706,6 @@ def validate_home_insurance(intent_request, session_id, home_coverage, home_type
             'Do you have a home security system [Yes, No]?'
         )
 
-    return {'isValid': True}
-
-def validate_auto_insurance(intent_request, session_id, auto_coverage, age_of_insured, property_value, auto_year, annual_mileage, parking_location, previous_claims):
-    """
-    Validates slot values specific to Auto insurance.
-    """
-    print(f"validate_auto_insurance auto_coverage: {auto_coverage}")
-    if auto_coverage is not None:
-        print(f"auto_coverage: {auto_coverage}")
-        auto_coverage_list = ['liability', 'collision', 'comprehensive', 'all']
-        if not isvalid_slot_value(auto_coverage, auto_coverage_list):
-            prompt = "The user was asked to specify the type of auto coverage [Liability, Collision, Comprehensive, All] as part of a home insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nPlease specify the type of auto coverage [Liability, Collision, Comprehensive, All]."
-            return build_validation_result(False, 'AutoCoverage', reply)
-    else:
-        print("ELSE")
-        return build_validation_result(
-            False,
-            'AutoCoverage',
-            'Please specify the type of auto coverage [Liability, Collision, Comprehensive, All].'
-        )   
-
-    if age_of_insured is not None:
-        if not isvalid_number(age_of_insured):
-            prompt = "The user was just asked for the age of the insured on an auto insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nWhat is the age of the insured?"
-            return build_validation_result(False, 'AgeOfInsured', reply)
-    else:
-        return build_validation_result(
-            False,
-            'AgeOfInsured',
-            'What is the age of the insured?'
-        )
-
-    if property_value is not None:
-        if not isvalid_number(property_value):
-            prompt = "The user was just asked for their car value as part of an auto insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nWhat is the estimated value of your car?"
-            return build_validation_result(False, 'PropertyValue', reply)
-    else:
-        return build_validation_result(
-            False,
-            'PropertyValue',
-            'What is the estimated value of your car?'
-        )
-
-    if auto_year is not None:
-        if not isvalid_date(auto_year):
-            prompt = "The user was just asked which year their vehicle was built as part of an auto insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nWhich year was your vehicle built?"
-            return build_validation_result(False, 'AutoYear', reply)        
-    else:
-        return build_validation_result(
-            False,
-            'AutoYear',
-            'Which year was your vehicle built?'
-        )
-
-    if annual_mileage is not None:
-        if not isvalid_number(annual_mileage):
-            prompt = "The user was just asked for the estimated annual mileage as part of an auto insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nWhat is the estimated annual mileage of your car?"
-            return build_validation_result(False, 'AnnualMileage', reply)
-    else:
-        return build_validation_result(
-            False,
-            'AnnualMileage',
-            'What is the estimated annual mileage of your car?'
-        )
-
-    if parking_location is not None:
-        parking_location_list = ['garage', 'street', 'driveway']
-        if not isvalid_slot_value(parking_location, parking_location_list):
-            prompt = "The user was just asked where their car is usually parked (Garage, Street, Driveway) as part of an auto insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nWhere is your car usually parked [Garage, Street, Driveway]?"
-            return build_validation_result(False, 'ParkingLocation', reply)
-    else:
-        return build_validation_result(
-            False,
-            'ParkingLocation',
-            'Where is your car usually parked [Garage, Street, Driveway]?'
-        )
-
-    if previous_claims is not None:
-        previous_claims_list = ['yes', 'no']
-        if not isvalid_slot_value(previous_claims, previous_claims_list):
-            prompt = "The user was just asked if they have filed any auto insurance claims in the last three years ['Yes', 'No'] as part of an auto insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nHave you filed any auto insurance claims in the past three years [Yes/No]?"
-            return build_validation_result(False, 'PreviousClaims', reply)
-    else:
-        return build_validation_result(
-            False,
-            'PreviousClaims',
-            'Have you filed any auto insurance claims in the past three years [Yes/No]?'
-        )
-
-    return {'isValid': True}
-
-def validate_life_insurance(intent_request, session_id, life_policy_type, age_of_insured, annual_income):
-    """
-    Validates slot values specific to Life insurance.
-    """
-    if life_policy_type is not None:
-        life_policy_type_list = ['term', 'whole', 'universal', 'variable']
-        if not isvalid_slot_value(life_policy_type, life_policy_type_list):
-            prompt = "The user was asked to specify the type of life insurance policy [Term, Whole, Universal] and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nPlease specify the type of life insurance policy [Term, Whole, Universal]."
-            return build_validation_result(False, 'LifePolicyType', reply)
-
-    else:
-        return build_validation_result(
-            False,
-            'LifePolicyType',
-            'Please specify the type of life insurance policy [Term, Whole, Universal, Variable].'
-        )
-
-    if age_of_insured is not None:
-        if not isvalid_number(age_of_insured):
-            prompt = "The user was just asked for the age of the insured as part of a life insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nWhat is the age of the insured?"
-            return build_validation_result(False, 'AgeOfInsured', reply)
-    else:
-        return build_validation_result(
-            False,
-            'AgeOfInsured',
-            'What is the age of the insured?'
-        )
-
-    if annual_income is not None:
-        if not isvalid_number(annual_income):
-            prompt = "The user was asked for the insured's annual income as part of a life insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nWhat is the insured's annual income?"
-            return build_validation_result(False, 'AnnualIncome', reply)               
-    else:
-        return build_validation_result(
-            False,
-            'AnnualIncome',
-            "What is the insured's annual income?"
-        )
-
-    return {'isValid': True}
-
-def validate_insurance_quote(intent_request, username, policy_type, policy_start_date, slots):
-    """
-    Elicits and validates slot values provided by the user for insurance quote generation.
-    """
-    confirmation_status = intent_request['sessionState']['intent']['confirmationState']
-    session_attributes = intent_request['sessionState'].get("sessionAttributes") or {}
-    session_id = intent_request['sessionId']
-
-    if username is not None:
-        if not isvalid_username(username):
-            return build_validation_result(
-                False,
-                'UserName',
-                'Our records indicate there is no profile belonging to the username, {}. Please enter a valid username'.format(username)
-            )
-    else:
-        try:
-            session_username = intent_request['sessionState']['sessionAttributes']['UserName']
-            build_slot(intent_request, 'UserName', session_username)
-        except KeyError:
-            return build_validation_result(
-                False,
-                'UserName',
-                'You have been logged out. Please start a new session.'
-            )
-
-    if policy_type is not None:
-        if policy_type == 'Home':
-            # Home slot values
-            home_coverage = try_ex(slots['HomeCoverage'])
-            home_type = try_ex(slots['HomeType'])
-            property_value = try_ex(slots['PropertyValue'])
-            year_built = try_ex(slots['YearBuilt'])
-            square_footage = try_ex(slots['SquareFootage'])
-            home_security_system = try_ex(slots['HomeSecuritySystem'])
-
-            validation_results = validate_home_insurance(intent_request, session_id, home_coverage, home_type, property_value, year_built, square_footage, home_security_system)
-            if not validation_results['isValid']:
-                return validation_results
-
-        elif policy_type == 'Auto':
-            # Auto slot values
-            auto_coverage = try_ex(slots['AutoCoverage'])
-            age_of_insured = try_ex(slots['AgeOfInsured'])
-            property_value = try_ex(slots['PropertyValue'])
-            auto_year = try_ex(slots['AutoYear'])
-            annual_mileage = try_ex(slots['AnnualMileage'])
-            parking_location = try_ex(slots['ParkingLocation'])
-            previous_claims = try_ex(slots['PreviousClaims'])
-
-            validation_results = validate_auto_insurance(intent_request, session_id, auto_coverage, age_of_insured, property_value, auto_year, annual_mileage, parking_location, previous_claims)
-            if not validation_results['isValid']:
-                return validation_results
-
-        elif policy_type == 'Life':
-            # Life slot values
-            life_policy_type = try_ex(slots['LifePolicyType'])
-            age_of_insured = try_ex(slots['AgeOfInsured'])
-            annual_income = try_ex(slots['AnnualIncome'])
-
-            validation_results = validate_life_insurance(intent_request, session_id, life_policy_type, age_of_insured, annual_income)
-            if not validation_results['isValid']:
-                return validation_results
-    else:
-        return build_validation_result(
-            False,
-            'PolicyType',
-            'Which type of insurance policy do you need [Home, Auto, Life]?'
-        )
-
     if policy_start_date is None:
         return build_validation_result(
             False,
@@ -710,40 +716,19 @@ def validate_insurance_quote(intent_request, username, policy_type, policy_start
     return {'isValid': True}
 
 
-def generate_insurance_quote(intent_request):
+def generate_home_warranty_quote(intent_request):
     """
     Performs dialog management and fulfillment for completing an insurance quote request.
     """
     slots = intent_request['sessionState']['intent']['slots']
-    
-    # Common slots regardless of 'policy_type'
-    username = try_ex(slots['UserName'])
-    policy_type = try_ex(slots['PolicyType'])
-    policy_start_date = try_ex(slots['PolicyStartDate'])
-
     confirmation_status = intent_request['sessionState']['intent']['confirmationState']
     session_attributes = intent_request['sessionState'].get("sessionAttributes") or {}
     intent = intent_request['sessionState']['intent']
     active_contexts = {}
 
     if intent_request['invocationSource'] == 'DialogCodeHook':    
-        # Validate any slots which have been specified. If any are invalid, re-elicit for their value
-        input_transcript = intent_request['inputTranscript']
-        policy_type_list = ['Home', 'Auto', 'Life']
 
-        if input_transcript in policy_type_list:
-            policy_type = input_transcript
-            policy_type_slot = {
-                "shape": "Scalar",
-                "value": {
-                    "originalValue": policy_type,
-                    "interpretedValue": policy_type,
-                    "resolvedValues": []
-                }
-            }
-            slots['PolicyType'] = policy_type_slot
-        
-        validation_result = validate_insurance_quote(intent_request, username, policy_type, policy_start_date, slots)
+        validation_result = validate_home_warranty_quote(intent_request, slots)
 
         if not validation_result['isValid']:
             slots = intent_request['sessionState']['intent']['slots']
@@ -760,7 +745,7 @@ def generate_insurance_quote(intent_request):
     if username and policy_type:
 
         # Determine which PDF to fill out based on coverage type
-        pdf_template = ''
+        pdf_template = 'home_warranty.pdf'
         fields_to_update = {}
 
         # Determine if the intent and current slot settings have been denied
@@ -770,14 +755,6 @@ def generate_insurance_quote(intent_request):
         if confirmation_status == 'Confirmed':
             intent['confirmationState']="Confirmed"
             intent['state']="Fulfilled"
-
-        # Based on policy_type, set the appropriate PDF template
-        if policy_type == 'Home':
-            pdf_template = 'home_insurance_template.pdf'
-        elif policy_type == 'Auto':
-            pdf_template = 'auto_insurance_template.pdf'
-        elif policy_type == 'Life':
-            pdf_template = 'life_insurance_template.pdf'
 
         # PDF generation and S3 upload logic
         s3_client.download_file(s3_artifact_bucket, f'agent/assets/{pdf_template}', f'/tmp/{pdf_template}')
@@ -817,7 +794,7 @@ def generate_insurance_quote(intent_request):
         # Create insurance quote doc in S3
         URLs = []
         URLs.append(create_presigned_url(s3_artifact_bucket, f'agent/assets/{pdf_template.replace(".pdf", "-completed.pdf")}', 3600))
-        insurance_quote_link = f'Your insurance quote request is ready! Please follow the link for details: {URLs[0]}'
+        insurance_quote_link = f'Your home warranty quote request is ready! Please follow the link for details: {URLs[0]}'
 
         # Write insurance quote request data to DynamoDB
         quote_request = {}
@@ -841,7 +818,7 @@ def generate_insurance_quote(intent_request):
             }
         )
 
-        print("Insurance Quote Request Submitted Successfully")
+        print("Home Warranty Quote Request Submitted Successfully")
 
         return elicit_intent(
             intent_request,
@@ -874,7 +851,7 @@ def invoke_agent(prompt, session_id):
     chat = Chat({'Human': prompt}, session_id)
     llm = Bedrock(client=bedrock_client, model_id="anthropic.claude-v2:1", region_name=os.environ['AWS_REGION']) # anthropic.claude-instant-v1 / anthropic.claude-3-sonnet-20240229-v1:0
     llm.model_kwargs = {'max_tokens_to_sample': 350}
-    lex_agent = InsuranceAgent(llm, chat.memory)
+    lex_agent = HomeWarrantyAgent(llm, chat.memory)
     
     message = lex_agent.run(input=prompt)
 
@@ -897,7 +874,7 @@ def genai_intent(intent_request):
     if intent_request['invocationSource'] == 'DialogCodeHook':
         prompt = intent_request['inputTranscript']
         output = invoke_agent(prompt, session_id)
-        print(f"Insurance Agent response: {output}")
+        print(f"Home Warranty Agent response: {output}")
 
     return elicit_intent(intent_request, session_attributes, output)
 
@@ -914,7 +891,7 @@ def dispatch(intent_request):
     if intent_name == 'VerifyIdentity':
         return verify_identity(intent_request)
     elif intent_name == 'InsuranceQuoteRequest':
-        return generate_insurance_quote(intent_request)
+        return generate_home_warranty_quote(intent_request)
     elif intent_name == 'LoanCalculator':
         return loan_calculator(intent_request)
     else:
