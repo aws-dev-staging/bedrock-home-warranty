@@ -1,6 +1,6 @@
 [
   {
-    "UserName": "Basic User",
+    "UserName": "Starter User",
     "PolicyId": "HW101604237",
     "PropertyType": "Single Family Home",
     "PropertyValue": 350000,
@@ -10,7 +10,7 @@
       "State": "NY",
       "Zip": "54321"
     },
-    "CoverageType": "Basic Plan",
+    "PlanType": "Starter Plan",
     "CoveredItems": [
       "Dishwasher",
       "Refrigerator",
@@ -19,12 +19,11 @@
     "DeductibleAmount": 150,
     "PolicyStartDate": "2024-06-01",
     "PolicyEndDate": "2025-06-01",
-    "ServiceFee": 75,
     "CoverageDescription": "This plan covers essential home appliances including dishwasher, refrigerator, and oven.",
     "Pin": 1234
   },
   {
-    "UserName": "Premier User",
+    "UserName": "Essential User",
     "PolicyId": "HW101604238",
     "PropertyType": "Condo",
     "PropertyValue": 250000,
@@ -34,7 +33,7 @@
       "State": "CA",
       "Zip": "67890"
     },
-    "CoverageType": "Premier Plan",
+    "PlanType": "Essential Plan",
     "CoveredItems": [
       "HVAC System",
       "Electrical System",
@@ -45,12 +44,11 @@
     "DeductibleAmount": 200,
     "PolicyStartDate": "2024-07-01",
     "PolicyEndDate": "2025-07-01",
-    "ServiceFee": 85,
-    "CoverageDescription": "This plan provides comprehensive coverage for major home systems and appliances.",
+    "CoverageDescription": "This plan covers electrical and heating systems, dishwasher and refrigerator, oven and cooktop, built-in microwave oven, clothes washer and dryer, water heater, air conditioning, and garage door opener.",
     "Pin": 1234
   },
   {
-    "UserName": "Optional User",
+    "UserName": "Premium User",
     "PolicyId": "HW101604239",
     "PropertyType": "Townhouse",
     "PropertyValue": 300000,
@@ -60,7 +58,7 @@
       "State": "TX",
       "Zip": "13579"
     },
-    "CoverageType": "Optional Add-Ons",
+    "PlanType": "Premium Plan",
     "CoveredItems": [
       "Pool",
       "Spa",
@@ -69,8 +67,7 @@
     "DeductibleAmount": 100,
     "PolicyStartDate": "2024-08-01",
     "PolicyEndDate": "2025-08-01",
-    "ServiceFee": 60,
-    "CoverageDescription": "This plan covers optional items such as pool, spa, and well pump.",
+    "CoverageDescription": "This plan covers everything in the Starter and Essential plans. Additionally, this plan provides coverage for luxury appliances, garbage disposal, full garage door system, faucets, water dispenser, and additional coverage enhancements.",
     "Pin": 1234
   }
 ]

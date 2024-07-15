@@ -129,7 +129,7 @@ Resources:
       GlobalSecondaryIndexes:
         - IndexName: PolicyIdIndex
           KeySchema:
-            - AttributeName: policyId
+            - AttributeName: PolicyId
               KeyType: HASH
           Projection:
             ProjectionType: ALL

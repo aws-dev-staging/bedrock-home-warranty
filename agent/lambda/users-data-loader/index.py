@@ -17,6 +17,8 @@ def to_dynamodb_attribute(value):
         return {'NULL': True}
     elif isinstance(value, str):
         return {'S': value}
+    elif isinstance(value, bool):
+        return {'BOOL': value}
     elif isinstance(value, (int, float)):
         return {'N': str(value)}
     elif isinstance(value, dict):
@@ -24,6 +26,11 @@ def to_dynamodb_attribute(value):
         for nested_key, nested_value in value.items():
             nested_attributes[nested_key] = to_dynamodb_attribute(nested_value)
         return {'M': nested_attributes}
+    elif isinstance(value, list):
+        list_attribute = []
+        for item in value:
+            list_attribute.append(to_dynamodb_attribute(item))
+        return {'L': list_attribute}
     else:
         raise ValueError("Unsupported data type: {}".format(type(value)))
 

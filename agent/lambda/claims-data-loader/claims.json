@@ -28,7 +28,14 @@
     "NumberWitnesses": 0,
     "SuspiciousActivity": false,
     "MonthsAsCustomer": 60,
-    "Status": "Closed"
+    "Status": "Closed",
+    "PropertyType": "Single-Family",
+    "PlanType": "Essential",
+    "Appliances": ["Dishwasher"],
+    "Plumbing": ["Plumbing"],
+    "Systems": ["Electrical"],
+    "HVAC": ["Air Conditioning"],
+    "AdditionalLimits": []
   },
   {
     "ClaimId": "5t16u-7v",
@@ -53,14 +60,21 @@
     },
     "ClaimAmount": {
       "Total": 1200,
-      "TepairCost": 1150,
-      "TerviceFee": 50
+      "RepairCost": 1150,
+      "ServiceFee": 50
     },
     "NumberWitnesses": 0,
     "SuspiciousActivity": false,
     "MonthsAsCustomer": 65,
     "Status": "Open",
-    "PendingDocuments": ["HVAC Technician Report", "Invoice"]
+    "PendingDocuments": ["HVAC Technician Report", "Invoice"],
+    "PropertyType": "Multi-Family",
+    "PlanType": "Premium",
+    "Appliances": ["None"],
+    "Plumbing": ["Water Heater"],
+    "Systems": ["HVAC"],
+    "HVAC": ["Heating"],
+    "AdditionalLimits": ["pool"]
   },
   {
     "ClaimId": "2s34w-8x",
@@ -92,6 +106,13 @@
     "SuspiciousActivity": false,
     "MonthsAsCustomer": 36,
     "Status": "Open",
-    "PendingDocuments": ["Technician Diagnosis Report", "Proof of Purchase for Replacement"]
+    "PendingDocuments": ["Technician Diagnosis Report", "Proof of Purchase for Replacement"],
+    "PropertyType": "Condominium",
+    "PlanType": "Starter",
+    "Appliances": ["Kitchen Refrigerator"],
+    "Plumbing": ["Garbage Disposal"],
+    "Systems": ["Electrical"],
+    "HVAC": ["Air Conditioning"],
+    "AdditionalLimits": ["spa"]
   }
 ]

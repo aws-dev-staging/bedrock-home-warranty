@@ -370,26 +370,28 @@ def verify_identity(intent_request):
                 # Customize message based on home warranty details
                 message_parts = []
                 items = response['Items']
+
                 for item in items:
                     policy_id = item.get('PolicyId')
                     property_type = item.get('PropertyType')
                     property_value = item.get('PropertyValue')
                     property_address = item.get('PropertyAddress', {})
-                    coverage_type = item.get('CoverageType')
+                    plan_type = item.get('PlanType')
                     covered_items = item.get('CoveredItems', [])
                     deductible_amount = item.get('DeductibleAmount')
+                    coverage_description = item.get('CoverageDescription', '')
                     policy_start_date = item.get('PolicyStartDate')
                     policy_end_date = item.get('PolicyEndDate')
-                    service_fee = item.get('ServiceFee')
-                    coverage_description = item.get('CoverageDescription', '')
 
                     if policy_id:
                         build_slot(intent_request, 'PolicyId', policy_id)
                         message_parts.append(f"Your home warranty policy ID is {policy_id}.")
+
                     if property_type and property_value:
                         build_slot(intent_request, 'PropertyType', property_type)
                         build_slot(intent_request, 'PropertyValue', property_value)
                         message_parts.append(f"It covers a {property_type} valued at ${property_value:,}.")
+
                     if property_address:
                         address = ', '.join(filter(None, [
                             property_address.get('street', ''),
@@ -397,26 +399,28 @@ def verify_identity(intent_request):
                             property_address.get('state', ''),
                             property_address.get('zip', '')
                         ]))
+
                         if address:
                             build_slot(intent_request, 'PropertyAddress', address)
                             message_parts.append(f"Located at {address}.")
+
                     if coverage_type and covered_items:
                         build_slot(intent_request, 'CoverageType', coverage_type)
                         build_slot(intent_request, 'CoveredItems', covered_items)
                         message_parts.append(f"You have a {coverage_type} which includes coverage for {', '.join(covered_items)}.")
+
+                    if deductible_amount:
+                        build_slot(intent_request, 'DeductibleAmount', deductible_amount)
+                        message_parts.append(f"Your deductible amount is ${deductible_amount:,}.")
+
+                    if coverage_description:
+                        build_slot(intent_request, 'CoverageDescription', coverage_description)
+                        message_parts.append(coverage_description)
+
                     if policy_start_date and policy_end_date:
                         build_slot(intent_request, 'PolicyStartDate', policy_start_date)
                         build_slot(intent_request, 'PolicyEndDate', policy_end_date)
                         message_parts.append(f"The policy started on {policy_start_date} and ends on {policy_end_date}.")
-                    if deductible_amount:
-                        build_slot(intent_request, 'DeductibleAmount', deductible_amount)
-                        message_parts.append(f"Your deductible amount is ${deductible_amount:,}.")
-                    if service_fee:
-                        build_slot(intent_request, 'ServiceFee', service_fee)
-                        message_parts.append(f"The service fee is ${service_fee:,}.")
-                    if coverage_description:
-                        build_slot(intent_request, 'CoverageDescription', coverage_description)
-                        message_parts.append(coverage_description)
 
                 message = ' '.join(message_parts)
 
@@ -439,17 +443,20 @@ def validate_home_warranty_quote(intent_request, slots):
     session_attributes = intent_request['sessionState'].get("sessionAttributes") or {}
     session_id = intent_request['sessionId']
 
-    # Change these slot keys to be more meaningful for the home warranty use case
     username = try_ex(slots['UserName'])
-    policy_type = try_ex(slots['PolicyType'])
+    property_type = try_ex(slots['PropertyType'])
+    plan_type = try_ex(slots['PlanType'])
+    appliances = try_ex(slots['Appliances'])
+    plumbing = try_ex(slots['Plumbing'])
+    systems = try_ex(slots['Systems'])
+    hvac = try_ex(slots['HVAC'])
+    additional_limits = try_ex(slots['AdditionalLimits'])
     policy_start_date = try_ex(slots['PolicyStartDate'])
-    home_coverage = try_ex(slots['HomeCoverage'])
-    home_type = try_ex(slots['HomeType'])
-    property_value = try_ex(slots['PropertyValue'])
-    year_built = try_ex(slots['YearBuilt'])
-    square_footage = try_ex(slots['SquareFootage'])
-    home_security_system = try_ex(slots['HomeSecuritySystem'])
+    policy_end_date = try_ex(slots['PolicyEndDate'])
 
+    user_help_flag = False
+
+    # Validate UserName
     if username is not None:
         if not isvalid_username(username):
             return build_validation_result(
@@ -468,250 +475,140 @@ def validate_home_warranty_quote(intent_request, slots):
                 'You have been logged out. Please start a new session.'
             )
 
-    # Property Information
-
-    if property_address is None:
-        if not isvalid_username(username):
-            return build_validation_result(
-                False,
-                'UserName',
-                'Our records indicate there is no profile belonging to the username, {}. Please enter a valid username'.format(username)
-            )
+    # Validate PropertyType
+    property_type_list = ['Single-Family','Multi-Family', 'Condominium', 'Townhome', 'Mobile Home']
+    property_types_str = ', '.join(property_type_list)
+    if property_type is not None:
+        if not isvalid_slot_value(property_type, property_type_list):
+            prompt = f"The user was asked to specify the property type [{property_types_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
+            message = invoke_agent(prompt, session_id)
+            reply = f"{message}\n\nPlease specify the type of property [{property_types_str}]."
+            return build_validation_result(False, 'PropertyType', reply)
     else:
-        try:
-            session_username = intent_request['sessionState']['sessionAttributes']['UserName']
-            build_slot(intent_request, 'UserName', session_username)
-        except KeyError:
-            return build_validation_result(
-                False,
-                'UserName',
-                'You have been logged out. Please start a new session.'
-            )
-
-        return build_validation_result(
-            False,
-            'PropertyAddress',
-            'What is the address of the property you want to insure?'
-        )
-
-    if property_type is None:
         return build_validation_result(
             False,
             'PropertyType',
-            'Is this property your primary residence, a rental property, or a vacation home?'
+            f'Please specify the type of property [{property_types_str}].'
         )
 
-    if property_size is not None and not isvalid_number(property_size):
+    # Validate PlanType
+    plan_type_list = ['Starter', 'Essential', 'Premium', 'Unsure']
+    plan_type_list_str = ', '.join(plan_type_list)
+    if plan_type is not None:
+        if not isvalid_slot_value(plan_type, plan_type_list):
+            prompt = f"The user was asked to select a plan type [{plan_type_list_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
+            message = invoke_agent(prompt, session_id)
+            reply = f"{message}\n\nPlease specify the type of plan [{plan_type_list_str}]. Respond 'Unsure' if you would like assistance selecting your plan type."
+            return build_validation_result(False, 'PlanType', reply)
+        elif isvalid_slot_value(plan_type, 'Unsure'):
+            user_help_flag = True
+    else:
         return build_validation_result(
             False,
-            'PropertySize',
-            'Please enter a valid number for the property size.'
+            'PlanType',
+            f"Please specify the type of plan {plan_type_list_str}. Respond 'Unsure' if you would like assistance selecting your plan type."
         )
 
-    if stories is not None and not isvalid_number(stories):
-        return build_validation_result(
-            False,
-            'Stories',
-            'Please enter a valid number for the number of stories.'
-        )
+    # if PlanType is "unsure" elicit appliances, plumbing, systems, HVAC, and addition limits slot values
+    print(f"user_help_flag: {user_help_flag}")
+    if user_help_flag:
 
-    if bedrooms is not None and not isvalid_number(bedrooms):
-        return build_validation_result(
-            False,
-            'Bedrooms',
-            'Please enter a valid number for the number of bedrooms.'
-        )
-
-    if bathrooms is not None and not isvalid_number(bathrooms):
-        return build_validation_result(
-            False,
-            'Bathrooms',
-            'Please enter a valid number for the number of bathrooms.'
-        )
-
-
-    # Property Age and Condition
-
-    if year_built is not None and not isvalid_date(year_built):
-        return build_validation_result(
-            False,
-            'YearBuilt',
-            'Please enter a valid year for when the property was built.'
-        )
-
-
-    # System and Appliance Information
-
-    valid_heating_systems = ['furnace', 'boiler', 'heat pump']
-    if heating_system is not None and heating_system.lower() not in valid_heating_systems:
-        return build_validation_result(
-            False,
-            'HeatingSystem',
-            f'Please specify a valid heating system type: {", ".join(valid_heating_systems)}.'
-        )
-
-    valid_cooling_systems = ['central AC', 'window units']
-    if cooling_system is not None and cooling_system.lower() not in valid_cooling_systems:
-        return build_validation_result(
-            False,
-            'CoolingSystem',
-            f'Please specify a valid cooling system type: {", ".join(valid_cooling_systems)}.'
-        )
-
-
-    # Warranty Coverage Preferences
-
-    valid_coverage_levels = ['basic', 'standard', 'comprehensive']
-    if coverage_level is not None and coverage_level.lower() not in valid_coverage_levels:
-        return build_validation_result(
-            False,
-            'CoverageLevel',
-            f'Please specify a valid coverage level: {", ".join(valid_coverage_levels)}.'
-        )
-
-
-    # Additional Coverage Options
-
-    if additional_coverage is not None:
-        valid_additional_coverage_options = ['pool', 'spa', 'well pump']
-        for item in additional_coverage:
-            if item.lower() not in valid_additional_coverage_options:
-                return build_validation_result(
-                    False,
-                    'AdditionalCoverage',
-                    f'Please specify valid additional coverage options: {", ".join(valid_additional_coverage_options)}.'
-                )
-
-
-    # Service and Usage Information
-
-    if property_usage is not None:
-        valid_property_usage_options = ['primary residence', 'rental property', 'vacation home']
-        if property_usage.lower() not in valid_property_usage_options:
+        # Validate Appliances
+        appliances_list = ['Dishwasher', 'Refrigerator', 'Range Hood', 'Microwave', 'Oven', 'Washer', 'Dryer', 'Trash Compactor', 'All', 'None']
+        appliances_list_str = ', '.join(appliances_list)
+        if appliances is not None:
+            if not isvalid_slot_value(appliances, appliances_list):
+                prompt = f"The user was asked to specify the appliances ({appliances_list_str}) as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
+                message = invoke_agent(prompt, session_id)
+                reply = f"{message}\n\nWhich appliances do you want covered [{appliances_list_str}]?"
+                return build_validation_result(False, 'Appliances', reply)
+        else:
             return build_validation_result(
                 False,
-                'PropertyUsage',
-                f'Please specify a valid property usage type: {", ".join(valid_property_usage_options)}.'
+                'Appliances',
+                f'Please specify the appliances you want covered [{appliances_list_str}].'
             )
 
-    if past_claims is not None:
-        if not isvalid_number(past_claims):
+        # Validate Plumbing
+        plumbing_list = ['Plumbing', 'Plumbing Stoppages', 'Toilet Tanks, Bowls and Mechanisms', 'Water Heater', 'Garbage Disposal', 'Hose Bibbs', 'Install Ground Level Cleanout', 'Instant Hot Water Dispenser', 'Shower Head and Shower Arm', 'All', 'None']
+        plumbing_list_str = ', '.join(plumbing_list)
+        if plumbing is not None:
+            if not isvalid_slot_value(plumbing, plumbing_list):
+                prompt = f"The user was asked to specify the plumbing items [{plumbing_list_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
+                message = invoke_agent(prompt, session_id)
+                reply = f"{message}\n\nWhich plumbing items do you want covered [{plumbing_list_str}]?"
+                return build_validation_result(False, 'Plumbing', reply)
+        else:
             return build_validation_result(
                 False,
-                'PastClaims',
-                'Please enter a valid number for the past claims on this property.'
+                'Plumbing',
+                f'Please specify the plumbing items you want covered [{plumbing_list_str}].'
             )
 
-
-    # Discount and Membership Information
-
-    if homeowner_association_member is not None:
-        valid_membership_options = ['yes', 'no']
-        if homeowner_association_member.lower() not in valid_membership_options:
+        # Validate Systems
+        systems_list = ['Electrical', 'Fans (Attic, Exhaust, Ceiling, Whole House)', 'Garage Door Opener', 'Garage Door Springs, Hinges, and Transmitters', 'Central Vacuum System', 'All', 'None']
+        systems_list_str = ', '.join(systems_list)
+        if systems is not None:
+            if not isvalid_slot_value(systems, systems_list):
+                prompt = f"The user was asked to specify the systems [{systems_list_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
+                message = invoke_agent(prompt, session_id)
+                reply = f"{message}\n\nWhich systems do you want covered [{systems_list_str}]?"
+                return build_validation_result(False, 'Systems', reply)
+        else:
             return build_validation_result(
                 False,
-                'HomeownerAssociationMember',
-                'Please specify if you are a member of homeowner associations with "Yes" or "No".'
+                'Systems',
+                f'Please specify the systems you want covered [{systems_list_str}].'
             )
 
-    if other_insurance_policies is not None:
-        valid_insurance_options = ['yes', 'no']
-        if other_insurance_policies.lower() not in valid_insurance_options:
+        # Validate HVAC
+        hvac_list = ['Ductwork', 'Heating', 'Refrigerant', 'Air Conditioning', 'Mini-split Ductless Systems', 'Registers, Grills, Filters', 'Window AC Units', 'All', 'None']
+        hvac_list_str = ', '.join(hvac_list)
+        if hvac is not None:
+            if not isvalid_slot_value(hvac, hvac_list):
+                prompt = f"The user was asked to specify the HVAC items [{hvac_list_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
+                message = invoke_agent(prompt, session_id)
+                reply = f"{message}\n\nWhich HVAC items do you want covered [{hvac_list_str}]?"
+                return build_validation_result(False, 'HVAC', reply)
+        else:
             return build_validation_result(
                 False,
-                'OtherInsurancePolicies',
-                'Please specify if you have other insurance policies with us with "Yes" or "No".'
+                'HVAC',
+                f'Please specify the HVAC items you want covered [{hvac_list_str}].'
             )
 
-    ###
+        # Validate AdditionalLimits
+        additional_limits_list = ['Concrete Encasement', 'HVAC Lifting Equipment', 'Improper Installations/Modifications', 'Permits and Code Violations', 'Refrigerant Recapture, Reclaim, Disposal', 'All', 'None']
+        additional_limits_list_str = ', '.join(additional_limits_list)
+        if additional_limits is not None:
+            if not isvalid_slot_value(additional_limits, additional_limits_list):
+                prompt = f"The user was asked to specify the additional limits [{additional_limits_list_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
+                message = invoke_agent(prompt, session_id)
+                reply = f"{message}\n\nWhich additional limits do you want covered [{additional_limits_list_str}]?"
+                return build_validation_result(False, 'AdditionalLimits', reply)
+        else:
+            return build_validation_result(
+                False,
+                'AdditionalLimits',
+                f'Please specify the additional limits you want covered [{additional_limits_list_str}].'
+            )
 
-    if home_coverage is not None:
-        home_coverage_list = ['structure', 'contents', 'liability', 'all']
-        if not isvalid_slot_value(home_coverage, home_coverage_list):
-            prompt = "The user was asked to specify the type of home coverage [Structure, Contents, Liability, All] as part of a home insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nPlease specify the type of home coverage [Structure, Contents, Liability, All]."
-            return build_validation_result(False, 'HomeCoverage', reply)
-    else:
-        return build_validation_result(
-            False,
-            'HomeCoverage',
-            'Please specify the type of home coverage [Structure, Contents, Liability, All].'
-        )   
+        # Validate PolicyStartDate
+        if policy_start_date is None:
+            return build_validation_result(
+                False,
+                'PolicyStartDate',
+                'When would you like your policy to start?'
+            )
 
-    if home_type is not None:
-        home_type_list = ['single-family', 'multi-family', 'condo', 'townhouse']
-        if not isvalid_slot_value(home_type, home_type_list):
-            prompt = "The user was asked to specify the type of home [Single-Family, Multi-Family, Condo, Townhouse] as part of a home insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nPlease specify the type of home [Single-Family, Multi-Family, Condo, Townhouse]."
-            return build_validation_result(False, 'HomeType', reply)
-    else:
-        return build_validation_result(
-            False,
-            'HomeType',
-            'Please specify the type of home [Single-Family, Multi-Family, Condo, Townhouse].'
-        )
+        # Validate PolicyEndDate
+        if policy_start_date is None:
+            return build_validation_result(
+                False,
+                'PolicyEndDate',
+                'When would you like your policy to end?'
+            )
 
-    if property_value is not None:
-        if not isvalid_number(property_value):
-            prompt = "The user was just asked to provide their property value as part of a home insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nWhat is the estimated value of your home?"
-            return build_validation_result(False, 'PropertyValue', reply)
-    else:
-        return build_validation_result(
-            False,
-            'PropertyValue',
-            'What is the estimated value of your home?'
-        )
-
-    if year_built is not None:
-        if not isvalid_date(year_built):
-            prompt = "The user was just asked to provide the year their home was built as part of a home insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nWhich year was your home built?"
-            return build_validation_result(False, 'YearBuilt', reply)
-    else:
-        return build_validation_result(
-            False,
-            'YearBuilt',
-            'Which year was your home built?'
-        )
-
-    if square_footage is not None:
-        if not isvalid_number(square_footage):
-            prompt = "The user was just asked to provide the square footage of their home as part of a home insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nWhat is the square footage of your home?"
-            return build_validation_result(False, 'SquareFootage', reply)
-    else:
-        return build_validation_result(
-            False,
-            'SquareFootage',
-            'What is the square footage of your home?'
-        )
-
-    if home_security_system is not None:
-        security_system_list = ['yes', 'no']
-        if not isvalid_slot_value(home_security_system, security_system_list):
-            prompt = "The user was asked if they have a home security system [Yes, No] as part of a home insurance quote request and this was their response: " + intent_request['inputTranscript']
-            message = invoke_agent(prompt, session_id)
-            reply = message + " \n\nDo you have a home security system [Yes, No]?"
-            return build_validation_result(False, 'HomeSecuritySystem', reply)
-    else:
-        return build_validation_result(
-            False,
-            'HomeSecuritySystem',
-            'Do you have a home security system [Yes, No]?'
-        )
-
-    if policy_start_date is None:
-        return build_validation_result(
-            False,
-            'PolicyStartDate',
-            'When would you like the policy to start?'
-        )
 
     return {'isValid': True}
 
