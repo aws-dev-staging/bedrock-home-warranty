@@ -91,7 +91,7 @@ aws kendra create-faq \
     --index-id $KENDRA_INDEX_ID \
     --name $UNIQUE_STACK_NAME-S3Faq \
     --description "AnyCompany S3 FAQ" \
-    --s3-path Bucket=$S3_ARTIFACT_BUCKET_NAME,Key="agent/assets/AnyCompany-FAQs.csv" \
+    --s3-path Bucket=$S3_ARTIFACT_BUCKET_NAME,Key="agent/assets/FAHW-FAQs.csv" \
     --role-arn $KENDRA_DATA_SOURCE_ROLE_ARN \
     --file-format "CSV_WITH_HEADER" \
     --region $AWS_REGION

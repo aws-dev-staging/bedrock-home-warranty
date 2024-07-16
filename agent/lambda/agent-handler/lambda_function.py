@@ -642,7 +642,7 @@ def generate_home_warranty_quote(intent_request):
     if username and policy_type:
 
         # Determine which PDF to fill out based on coverage type
-        pdf_template = 'home_warranty.pdf'
+        pdf_template = 'home_warranty_quote_request.pdf'
         fields_to_update = {}
 
         # Determine if the intent and current slot settings have been denied
