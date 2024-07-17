@@ -39,7 +39,7 @@ export GITHUB_TOKEN_SECRET_NAME=$(aws secretsmanager create-secret --name $UNIQU
 
 aws cloudformation create-stack \
 --stack-name $UNIQUE_STACK_NAME \
---template-body file://../cfn/GenAI-Insurance-Agent.yml \
+--template-body file://../cfn/GenAI-Home-Warranty-Agent.yml \
 --parameters \
 ParameterKey=S3ArtifactBucket,ParameterValue=$S3_ARTIFACT_BUCKET_NAME \
 ParameterKey=UsersDataLoaderS3Key,ParameterValue=$USERS_DATA_LOADER_S3_KEY \
@@ -90,7 +90,7 @@ export KENDRA_WEBCRAWLER_DATA_SOURCE_ID=$(aws cloudformation describe-stacks \
 aws kendra create-faq \
     --index-id $KENDRA_INDEX_ID \
     --name $UNIQUE_STACK_NAME-S3Faq \
-    --description "AnyCompany S3 FAQ" \
+    --description "Home Warranty FAQ" \
     --s3-path Bucket=$S3_ARTIFACT_BUCKET_NAME,Key="agent/assets/FAHW-FAQs.csv" \
     --role-arn $KENDRA_DATA_SOURCE_ROLE_ARN \
     --file-format "CSV_WITH_HEADER" \

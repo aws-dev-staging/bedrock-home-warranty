@@ -258,7 +258,7 @@ Resources:
   AgentHandlerFunction:
     Type: AWS::Lambda::Function
     Properties:
-      Description: Lambda handler for GenAI Insurance Agent.
+      Description: Lambda handler for GenAI Home Warranty Agent.
       FunctionName: !Sub ${AWS::StackName}-GenAILexHandler
       Code:
         S3Bucket: !Ref S3ArtifactBucket
@@ -532,7 +532,7 @@ Resources:
     DependsOn: LexBotRole
     Type: AWS::Lex::Bot
     Properties:
-        Name: !Sub ${AWS::StackName}-Insurance-Agent
+        Name: !Sub ${AWS::StackName}-Home-Warranty-Agent
         BotFileS3Location: 
           S3Bucket: !Ref S3ArtifactBucket
           S3ObjectKey: !Ref LexBotS3Key

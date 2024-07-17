@@ -48,10 +48,10 @@ class Chat():
         )
 
     def get_chat_index(self):
-        key = {'id':self.user_id}
+        key = {'Id':self.user_id}
         chat_index = dynamodb.get_item(TableName=conversation_index_table_name, Key=ts.serialize(key)['M'])
         if 'Item' in chat_index:
-            return int(chat_index['Item']['chat_index']['N'])
+            return int(chat_index['Item']['ChatIndex']['N'])
         return 0
 
     def increment_chat_index(self):

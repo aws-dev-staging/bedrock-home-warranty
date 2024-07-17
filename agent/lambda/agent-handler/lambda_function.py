@@ -1,19 +1,18 @@
-import re
+# import re
 import os
 import json
 import time
 import boto3
 import pdfrw
 import difflib
-import logging
 import datetime
-import dateutil.parser
+import dateparser
 
 from chat import Chat
-from home_warranty_agent import HomeWarrantyAgent
 from boto3.dynamodb.conditions import Key
 from langchain.llms.bedrock import Bedrock
 from langchain.chains import ConversationChain
+from home_warranty_agent import HomeWarrantyAgent
 
 # Create reference to DynamoDB tables and S3 bucket
 users_table_name = os.environ['USERS_TABLE_NAME']
@@ -80,16 +79,12 @@ def elicit_intent(intent_request, session_attributes, message):
                 'imageResponseCard': {
                     "buttons": [
                         {
-                            "text": "Request Home Quote",
-                            "value": "Home"
+                            "text": "Home Warranty Quote",
+                            "value": "Home Warranty Quote"
                         },
                         {
-                            "text": "Request Auto Quote",
-                            "value": "Auto"
-                        },
-                        {
-                            "text": "Request Life Quote",
-                            "value": "Life"
+                            "text": "Summarize Claims",
+                            "value": "Summarize Claims"
                         },
                         {
                             "text": "Ask GenAI",
@@ -153,33 +148,35 @@ def build_validation_result(isvalid, violated_slot, message_content):
     
 # --- Utility helper functions ---
 
-def isvalid_number(value):
-    # regex to match a valid numeric string without leading '-' for negative numbers or value "0"
-    return bool(re.match(r'^(?:[1-9]\d*|[1-9]\d*\.\d+|\d*\.\d+)$', value))
+def isvalid_slot_value(value, slot_value_list):
+    """
+    Compares 'value' to 'slot_value_list' based on 'similarity_threshold'.
+    """
+    similarity_threshold = 0.5
 
-def isvalid_date(year):
-    try:
-        year_int = int(year)
-        current_year = int(datetime.datetime.now().year)
-        print(f"Year input: {year_int}, Current year: {current_year}")  # Debugging output
-        # Validate if the year is within a reasonable range
-        if year_int <= 0 or year_int > current_year:
-            return False
-        return True
-    except ValueError as e:
-        print(f"isvalid_date error: {e}")
-        return False
+    # Split the value into components
+    value_components = [v.strip() for v in value.split(',')]
 
-def isvalid_slot_value(value, slot_value_list): # Need to adjust
-    # Adjust this threshold as needed
-    similarity_threshold = 0.65
+    similarity_scores = []
 
-    # Calculate similarity using difflib
-    similarity_scores = [difflib.SequenceMatcher(None, value.lower(), ref_value).ratio() for ref_value in slot_value_list]
+    # Calculate similarity for each component of value
+    for component in value_components:
+        scores = [difflib.SequenceMatcher(None, component.lower(), ref_value.lower()).ratio() for ref_value in slot_value_list]
+        similarity_scores.extend(scores)
 
-    print(f"isvalid_slot_value similarity_scores: {similarity_scores}")
-    # Check if the word is close to 'yes' or 'no' based on similarity threshold
+    print(f"value: {value}\nslot_value_list: {slot_value_list}\nsimilarity_scores: {similarity_scores}")
+    
+    # Check if any similarity score meets or exceeds the threshold
     return any(score >= similarity_threshold for score in similarity_scores)
+
+def parse_date(date_str):
+    """
+    Parses 'date_str' into a datetime object before performing date arithmetic.
+    """
+    try:
+        return datetime.datetime.strptime(date_str, '%Y-%m-%d')
+    except ValueError:
+        return None
 
 def create_presigned_url(bucket_name, object_name, expiration=600):
     """
@@ -247,7 +244,7 @@ def isvalid_pin(username, pin):
 
         # Iterate over the items returned in the response
         if len(response['Items']) > 0:
-            pin_to_compare = int(response['Items'][0]['pin'])
+            pin_to_compare = int(response['Items'][0]['Pin'])
             # Check if the password in the item matches the specified password
             if pin_to_compare == int(pin):
                 return True
@@ -315,7 +312,7 @@ def validate_pin(intent_request, username, pin):
                 'You have entered an incorrect PIN. Please try again.'.format(pin)
             )
     else:
-        message = "Thank you for choosing AnyCompany, {}. Please confirm your 4-digit PIN before we proceed.".format(username)
+        message = "Thank you for choosing First American Home Warranty, {}. Please confirm your 4-digit PIN before we proceed.".format(username)
         return build_validation_result(
             False,
             'Pin',
@@ -341,7 +338,6 @@ def verify_identity(intent_request):
     active_contexts = {}
 
     # Validate any slots which have been specified. If any are invalid, re-elicit for their value
-    intent_request['sessionState']['intent']['slots']
     validation_result = validate_pin(intent_request, username, pin)
     session_attributes['UserName'] = username
 
@@ -379,48 +375,48 @@ def verify_identity(intent_request):
                     plan_type = item.get('PlanType')
                     covered_items = item.get('CoveredItems', [])
                     deductible_amount = item.get('DeductibleAmount')
+                    service_fee = item.get('ServiceFee')
                     coverage_description = item.get('CoverageDescription', '')
                     policy_start_date = item.get('PolicyStartDate')
                     policy_end_date = item.get('PolicyEndDate')
 
                     if policy_id:
+                        session_attributes['PolicyId'] = policy_id
                         build_slot(intent_request, 'PolicyId', policy_id)
                         message_parts.append(f"Your home warranty policy ID is {policy_id}.")
 
-                    if property_type and property_value:
+                    if plan_type and property_type and property_value:
+                        build_slot(intent_request, 'PlanType', plan_type)
                         build_slot(intent_request, 'PropertyType', property_type)
                         build_slot(intent_request, 'PropertyValue', property_value)
-                        message_parts.append(f"It covers a {property_type} valued at ${property_value:,}.")
+                        message_parts.append(f"\n\nYour {plan_type} covers a {property_type} valued at ${property_value:,}.")
 
                     if property_address:
                         address = ', '.join(filter(None, [
-                            property_address.get('street', ''),
-                            property_address.get('city', ''),
-                            property_address.get('state', ''),
-                            property_address.get('zip', '')
+                            property_address.get('Street', ''),
+                            property_address.get('City', ''),
+                            property_address.get('State', ''),
+                            property_address.get('Zip', '')
                         ]))
 
                         if address:
                             build_slot(intent_request, 'PropertyAddress', address)
                             message_parts.append(f"Located at {address}.")
 
-                    if coverage_type and covered_items:
-                        build_slot(intent_request, 'CoverageType', coverage_type)
+                    if covered_items and coverage_description:
                         build_slot(intent_request, 'CoveredItems', covered_items)
-                        message_parts.append(f"You have a {coverage_type} which includes coverage for {', '.join(covered_items)}.")
-
-                    if deductible_amount:
-                        build_slot(intent_request, 'DeductibleAmount', deductible_amount)
-                        message_parts.append(f"Your deductible amount is ${deductible_amount:,}.")
-
-                    if coverage_description:
                         build_slot(intent_request, 'CoverageDescription', coverage_description)
-                        message_parts.append(coverage_description)
+                        message_parts.append(f"{coverage_description}")
+
+                    if deductible_amount and service_fee:
+                        build_slot(intent_request, 'DeductibleAmount', deductible_amount)
+                        build_slot(intent_request, 'ServiceFee', service_fee)
+                        message_parts.append(f"\n\nYour deductible amount is ${deductible_amount:,} and your service fee is ${service_fee}.")
 
                     if policy_start_date and policy_end_date:
                         build_slot(intent_request, 'PolicyStartDate', policy_start_date)
                         build_slot(intent_request, 'PolicyEndDate', policy_end_date)
-                        message_parts.append(f"The policy started on {policy_start_date} and ends on {policy_end_date}.")
+                        message_parts.append(f"\n\nThe policy started on {policy_start_date} and ends on {policy_end_date}.")
 
                 message = ' '.join(message_parts)
 
@@ -482,31 +478,32 @@ def validate_home_warranty_quote(intent_request, slots):
         if not isvalid_slot_value(property_type, property_type_list):
             prompt = f"The user was asked to specify the property type [{property_types_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
             message = invoke_agent(prompt, session_id)
-            reply = f"{message}\n\nPlease specify the type of property [{property_types_str}]."
+            reply = f"{message}\n\nWhich type of property do you want to protect?\n\n[{property_types_str}]."
             return build_validation_result(False, 'PropertyType', reply)
     else:
         return build_validation_result(
             False,
             'PropertyType',
-            f'Please specify the type of property [{property_types_str}].'
+            f'Please specify the type of property you want to protect - [{property_types_str}].'
         )
 
     # Validate PlanType
     plan_type_list = ['Starter', 'Essential', 'Premium', 'Unsure']
-    plan_type_list_str = ', '.join(plan_type_list)
+    user_help_flag_list = ['Unsure']
+    plan_type_list_str = "Starter, Essential, Premium"
     if plan_type is not None:
         if not isvalid_slot_value(plan_type, plan_type_list):
             prompt = f"The user was asked to select a plan type [{plan_type_list_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
             message = invoke_agent(prompt, session_id)
-            reply = f"{message}\n\nPlease specify the type of plan [{plan_type_list_str}]. Respond 'Unsure' if you would like assistance selecting your plan type."
+            reply = f"{message}\n\nWhich coverage plan would you like?\n\n[{plan_type_list_str}].\n\nRespond 'Unsure' if you would like assistance selecting your plan type."
             return build_validation_result(False, 'PlanType', reply)
-        elif isvalid_slot_value(plan_type, 'Unsure'):
+        elif isvalid_slot_value(plan_type, user_help_flag_list):
             user_help_flag = True
     else:
         return build_validation_result(
             False,
             'PlanType',
-            f"Please specify the type of plan {plan_type_list_str}. Respond 'Unsure' if you would like assistance selecting your plan type."
+            f"Please specify your desired coverage plan - [{plan_type_list_str}].\n\nRespond 'Unsure' if you would like assistance selecting your plan type."
         )
 
     # if PlanType is "unsure" elicit appliances, plumbing, systems, HVAC, and addition limits slot values
@@ -520,13 +517,13 @@ def validate_home_warranty_quote(intent_request, slots):
             if not isvalid_slot_value(appliances, appliances_list):
                 prompt = f"The user was asked to specify the appliances ({appliances_list_str}) as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
                 message = invoke_agent(prompt, session_id)
-                reply = f"{message}\n\nWhich appliances do you want covered [{appliances_list_str}]?"
+                reply = f"{message}\n\nWhich appliances do you want covered?\n\n[{appliances_list_str}]."
                 return build_validation_result(False, 'Appliances', reply)
         else:
             return build_validation_result(
                 False,
                 'Appliances',
-                f'Please specify the appliances you want covered [{appliances_list_str}].'
+                f'To help determine the best home warranty plan for you, please specify the appliances you want covered -\n\n[{appliances_list_str}].'
             )
 
         # Validate Plumbing
@@ -536,13 +533,13 @@ def validate_home_warranty_quote(intent_request, slots):
             if not isvalid_slot_value(plumbing, plumbing_list):
                 prompt = f"The user was asked to specify the plumbing items [{plumbing_list_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
                 message = invoke_agent(prompt, session_id)
-                reply = f"{message}\n\nWhich plumbing items do you want covered [{plumbing_list_str}]?"
+                reply = f"{message}\n\nWhich plumbing items do you want covered?\n\n[{plumbing_list_str}]."
                 return build_validation_result(False, 'Plumbing', reply)
         else:
             return build_validation_result(
                 False,
                 'Plumbing',
-                f'Please specify the plumbing items you want covered [{plumbing_list_str}].'
+                f'Please specify the plumbing items you want covered -\n\n[{plumbing_list_str}].'
             )
 
         # Validate Systems
@@ -552,13 +549,13 @@ def validate_home_warranty_quote(intent_request, slots):
             if not isvalid_slot_value(systems, systems_list):
                 prompt = f"The user was asked to specify the systems [{systems_list_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
                 message = invoke_agent(prompt, session_id)
-                reply = f"{message}\n\nWhich systems do you want covered [{systems_list_str}]?"
+                reply = f"{message}\n\nWhich systems do you want covered?\n\n[{systems_list_str}]."
                 return build_validation_result(False, 'Systems', reply)
         else:
             return build_validation_result(
                 False,
                 'Systems',
-                f'Please specify the systems you want covered [{systems_list_str}].'
+                f'Please specify the systems you want covered -\n\n[{systems_list_str}].'
             )
 
         # Validate HVAC
@@ -568,29 +565,29 @@ def validate_home_warranty_quote(intent_request, slots):
             if not isvalid_slot_value(hvac, hvac_list):
                 prompt = f"The user was asked to specify the HVAC items [{hvac_list_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
                 message = invoke_agent(prompt, session_id)
-                reply = f"{message}\n\nWhich HVAC items do you want covered [{hvac_list_str}]?"
+                reply = f"{message}\n\nWhich HVAC items do you want covered?\n\n[{hvac_list_str}]."
                 return build_validation_result(False, 'HVAC', reply)
         else:
             return build_validation_result(
                 False,
                 'HVAC',
-                f'Please specify the HVAC items you want covered [{hvac_list_str}].'
+                f'Please specify the HVAC items you want covered -\n\n[{hvac_list_str}].'
             )
 
         # Validate AdditionalLimits
-        additional_limits_list = ['Concrete Encasement', 'HVAC Lifting Equipment', 'Improper Installations/Modifications', 'Permits and Code Violations', 'Refrigerant Recapture, Reclaim, Disposal', 'All', 'None']
+        additional_limits_list = ['Concrete Encasement', 'HVAC Lifting Equipment', 'Improper Installations/Modifications', 'Permits and Code Violations', 'Refrigerant Recapture', 'Reclaim', 'Disposal', 'All', 'None']
         additional_limits_list_str = ', '.join(additional_limits_list)
         if additional_limits is not None:
             if not isvalid_slot_value(additional_limits, additional_limits_list):
                 prompt = f"The user was asked to specify the additional limits [{additional_limits_list_str}] as part of a home warranty insurance quote request and this was their response: {intent_request['inputTranscript']}"
                 message = invoke_agent(prompt, session_id)
-                reply = f"{message}\n\nWhich additional limits do you want covered [{additional_limits_list_str}]?"
+                reply = f"{message}\n\nWhich additional limits do you want covered?\n\n[{additional_limits_list_str}]."
                 return build_validation_result(False, 'AdditionalLimits', reply)
         else:
             return build_validation_result(
                 False,
                 'AdditionalLimits',
-                f'Please specify the additional limits you want covered [{additional_limits_list_str}].'
+                f'Please specify the additional limits you want covered -\n\n[{additional_limits_list_str}].'
             )
 
         # Validate PolicyStartDate
@@ -601,14 +598,27 @@ def validate_home_warranty_quote(intent_request, slots):
                 'When would you like your policy to start?'
             )
 
+
         # Validate PolicyEndDate
-        if policy_start_date is None:
+        if policy_end_date is None:
             return build_validation_result(
                 False,
                 'PolicyEndDate',
                 'When would you like your policy to end?'
             )
 
+        start_date = dateparser.parse(policy_start_date)
+        end_date = dateparser.parse(policy_end_date)
+        print(f"start_date: {start_date}; end_date: {end_date}")
+
+        # Ensure PolicyEndDate is after PolicyStartDate
+        if policy_start_date is not None and policy_end_date is not None:
+            if policy_start_date >= policy_end_date:
+                return build_validation_result(
+                    False,
+                    'PolicyEndDate',
+                    'Policy end date must be after the start date. Please enter a valid end date.'
+                )
 
     return {'isValid': True}
 
@@ -618,6 +628,9 @@ def generate_home_warranty_quote(intent_request):
     Performs dialog management and fulfillment for completing an insurance quote request.
     """
     slots = intent_request['sessionState']['intent']['slots']
+    username = try_ex(slots['UserName'])
+    plan_type = try_ex(slots['PlanType'])
+
     confirmation_status = intent_request['sessionState']['intent']['confirmationState']
     session_attributes = intent_request['sessionState'].get("sessionAttributes") or {}
     intent = intent_request['sessionState']['intent']
@@ -639,7 +652,7 @@ def generate_home_warranty_quote(intent_request):
                 validation_result['message']
             )
 
-    if username and policy_type:
+    if username and plan_type:
 
         # Determine which PDF to fill out based on coverage type
         pdf_template = 'home_warranty_quote_request.pdf'
@@ -705,7 +718,7 @@ def generate_home_warranty_quote(intent_request):
         quote_request_string = json.dumps(quote_request)
 
         # Write the JSON document to DynamoDB
-        insurance_quote_requests_table = dynamodb.Table(insurance_quote_requests_table_name)
+        insurance_quote_requests_table = dynamodb.Table(home_warranty_quote_requests_table_name)
 
         response = insurance_quote_requests_table.put_item(
             Item={
@@ -727,23 +740,57 @@ def generate_home_warranty_quote(intent_request):
 # DEV BREAK
 
 
-def loan_calculator(intent_request):
+def generate_claim_summary(claims):
     """
-    Performs dialog management and fulfillment for calculating loan details.
-    This is an empty function framework intended for the user to develope their own intent fulfillment functions.
+    Generates a summary of the claims data.
     """
+    summary = []
+    for claim in claims:
+        summary.append(
+            f"Claim ID: {claim['ClaimId']}, Type: {claim['ClaimType']}, "
+            f"Date: {claim['Incident']['Date']}, Amount: ${claim['ClaimAmount']['Total']}, "
+            f"Status: {claim['Status']}, Description: {claim['Damage']['Description']}"
+        )
+    return "Here is the summary of your claims:\n" + "\n".join(summary)
+
+
+def summarize_claims(intent_request):
+    """
+    Summarizes claims data from 'claims_table_name' DynamoDB table.
+    """
+    slots = intent_request['sessionState']['intent']['slots']
     session_attributes = intent_request['sessionState'].get("sessionAttributes") or {}
 
-    # def elicit_intent(intent_request, session_attributes, message)
-    return elicit_intent(
-        intent_request,
-        session_attributes,
-        'This is where you would implement LoanCalculator intent fulfillment.'
-    )
+    # Retrieve slot values, check session attributes first
+    username = try_ex(slots.get('UserName')) or session_attributes.get('UserName')
+    policy_id = try_ex(slots.get('PolicyId')) or session_attributes.get('PolicyId')
+
+    claims_table = dynamodb.Table(claims_table_name)
+
+    try:
+        # Set up the query parameters
+        params = {
+            'KeyConditionExpression': Key('PolicyId').eq(policy_id)
+        }
+
+        # Execute the query and get the result
+        response = claims_table.query(**params)
+
+        # Check if any items were returned
+        message = "No claims found for the given policy ID."
+        if response['Count'] != 0:
+            claims = response['Items']
+            message = generate_claim_summary(claims)
+        return elicit_intent(intent_request, session_attributes, message)
+
+    except Exception as e:
+        print(f"Error summarizing claims: {e}")
+        return str(e)
+
 
 def invoke_agent(prompt, session_id):
     """
-    Invokes Amazon Bedrock-powered LangChain agent with 'prompt' input.
+    Invokes Amazon Bedrock-powered LangChain conversational agent with 'prompt' input.
     """
     chat = Chat({'Human': prompt}, session_id)
     llm = Bedrock(client=bedrock_client, model_id="anthropic.claude-v2:1", region_name=os.environ['AWS_REGION']) # anthropic.claude-instant-v1 / anthropic.claude-3-sonnet-20240229-v1:0
@@ -787,10 +834,10 @@ def dispatch(intent_request):
 
     if intent_name == 'VerifyIdentity':
         return verify_identity(intent_request)
-    elif intent_name == 'InsuranceQuoteRequest':
+    elif intent_name == 'HomeWarrantyQuote':
         return generate_home_warranty_quote(intent_request)
-    elif intent_name == 'LoanCalculator':
-        return loan_calculator(intent_request)
+    elif intent_name == 'SummarizeClaims':
+        return summarize_claims(intent_request)
     else:
         return genai_intent(intent_request)
 
@@ -807,3 +854,4 @@ def handler(event, context):
     time.tzset()
 
     return dispatch(event)
+

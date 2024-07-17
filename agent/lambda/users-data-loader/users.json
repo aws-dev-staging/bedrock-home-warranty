@@ -17,6 +17,7 @@
       "Oven"
     ],
     "DeductibleAmount": 150,
+    "ServiceFee": 100,
     "PolicyStartDate": "2024-06-01",
     "PolicyEndDate": "2025-06-01",
     "CoverageDescription": "This plan covers essential home appliances including dishwasher, refrigerator, and oven.",
@@ -42,6 +43,7 @@
       "Refrigerator"
     ],
     "DeductibleAmount": 200,
+    "ServiceFee": 75,
     "PolicyStartDate": "2024-07-01",
     "PolicyEndDate": "2025-07-01",
     "CoverageDescription": "This plan covers electrical and heating systems, dishwasher and refrigerator, oven and cooktop, built-in microwave oven, clothes washer and dryer, water heater, air conditioning, and garage door opener.",
@@ -65,6 +67,7 @@
       "Well Pump"
     ],
     "DeductibleAmount": 100,
+    "ServiceFee": 50,
     "PolicyStartDate": "2024-08-01",
     "PolicyEndDate": "2025-08-01",
     "CoverageDescription": "This plan covers everything in the Starter and Essential plans. Additionally, this plan provides coverage for luxury appliances, garbage disposal, full garage door system, faucets, water dispenser, and additional coverage enhancements.",

@@ -51,10 +51,7 @@ class Tools:
             PageNumber=1,
             PageSize=5  # Limit to 5 results
         )
-
         parsed_results = self.parse_kendra_response(kendra_response)
-
-        print(f"Amazon Kendra Query Item: {parsed_results}")
 
         # passing in the original question, and various Kendra responses as context into the LLM
         return self.invokeLLM(question, parsed_results)
@@ -63,9 +60,8 @@ class Tools:
         """
         Generates an answer for the user based on the Kendra response.
         """
-        prompt_data = f"""
-        Human:
-        Imagine you are First American Home Warranty's AI assistant. You respond quickly and friendly to questions from a user, providing both an answer and the sources used to find that answer.
+        prompt_data = f"""\n\nHuman:
+        Imagine you are First American Home Warranty's AI assistant responding to a consumer user. You respond quickly and friendly to questions from a user, providing both an answer and the sources used to find that answer.
 
         Format your response for optimal human readability and do not reference the context,
 
@@ -77,8 +73,7 @@ class Tools:
 
         Context: {context}
 
-        \n\nAssistant:
-        """
+        \n\nAssistant:"""
 
         # Formatting the prompt as a JSON string
         json_prompt = json.dumps({
