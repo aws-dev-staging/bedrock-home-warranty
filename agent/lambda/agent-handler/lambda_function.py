@@ -1,4 +1,4 @@
-# import re
+import re
 import os
 import json
 import time
@@ -6,7 +6,7 @@ import boto3
 import pdfrw
 import difflib
 import datetime
-import dateparser
+# import dateparser
 
 from chat import Chat
 from boto3.dynamodb.conditions import Key
@@ -607,18 +607,23 @@ def validate_home_warranty_quote(intent_request, slots):
                 'When would you like your policy to end?'
             )
 
-        start_date = dateparser.parse(policy_start_date)
+        '''start_date = dateparser.parse(policy_start_date)
         end_date = dateparser.parse(policy_end_date)
         print(f"start_date: {start_date}; end_date: {end_date}")
 
-        # Ensure PolicyEndDate is after PolicyStartDate
-        if policy_start_date is not None and policy_end_date is not None:
-            if policy_start_date >= policy_end_date:
-                return build_validation_result(
-                    False,
-                    'PolicyEndDate',
-                    'Policy end date must be after the start date. Please enter a valid end date.'
-                )
+        # Ensure PolicyEndDate is after PolicyStartDate and at least 30 days apart
+        if end_date <= start_date:
+            return build_validation_result(
+                False,
+                'PolicyEndDate',
+                'Policy end date must be after the start date. Please enter a valid end date.'
+            )
+        elif (end_date - start_date).days < 30:
+            return build_validation_result(
+                False,
+                'PolicyEndDate',
+                'Policy end date must be at least 30 days after the start date. Please enter a valid end date.'
+            )'''
 
     return {'isValid': True}
 
@@ -740,7 +745,7 @@ def generate_home_warranty_quote(intent_request):
 # DEV BREAK
 
 
-def generate_claim_summary(claims):
+def generate_claim_summary(claims, username, policy_id):
     """
     Generates a summary of the claims data.
     """
@@ -751,7 +756,7 @@ def generate_claim_summary(claims):
             f"Date: {claim['Incident']['Date']}, Amount: ${claim['ClaimAmount']['Total']}, "
             f"Status: {claim['Status']}, Description: {claim['Damage']['Description']}"
         )
-    return "Here is the summary of your claims:\n" + "\n".join(summary)
+    return f"{username}, here is the summary of your claims for policy ID, {policy_id} -\n\n" + "\n".join(summary)
 
 
 def summarize_claims(intent_request):
@@ -764,6 +769,10 @@ def summarize_claims(intent_request):
     # Retrieve slot values, check session attributes first
     username = try_ex(slots.get('UserName')) or session_attributes.get('UserName')
     policy_id = try_ex(slots.get('PolicyId')) or session_attributes.get('PolicyId')
+
+   # Validate the slot values
+    if not policy_id:
+        return elicit_slot(intent_request, session_attributes, 'PolicyId', 'Please provide your policy ID.')
 
     claims_table = dynamodb.Table(claims_table_name)
 
@@ -780,7 +789,7 @@ def summarize_claims(intent_request):
         message = "No claims found for the given policy ID."
         if response['Count'] != 0:
             claims = response['Items']
-            message = generate_claim_summary(claims)
+            message = generate_claim_summary(claims, username, policy_id)
         return elicit_intent(intent_request, session_attributes, message)
 
     except Exception as e:

@@ -1,7 +1,7 @@
 [
   {
-    "ClaimId": "9x87y-3z",
     "PolicyId": "HW101604238",
+    "ClaimId": "9x87y-3z",
     "ClaimType": "Appliance Repair",
     "Email": "example@amazon.com",
     "ClaimDatetime": "2023-11-22 15:21:00",
@@ -38,8 +38,8 @@
     "AdditionalLimits": []
   },
   {
-    "ClaimId": "5t16u-7v",
     "PolicyId": "HW101604237",
+    "ClaimId": "5t16u-7v",
     "ClaimType": "System Repair",
     "Email": "example@amazon.com",
     "ClaimDatetime": "2023-11-30 14:15:00",
@@ -77,8 +77,8 @@
     "AdditionalLimits": ["pool"]
   },
   {
-    "ClaimId": "2s34w-8x",
     "PolicyId": "HW101604239",
+    "ClaimId": "2s34w-8x",
     "ClaimType": "Appliance Replacement",
     "Email": "example@amazon.com",
     "ClaimDatetime": "2023-11-27 11:07:00",

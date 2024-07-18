@@ -34,7 +34,6 @@ class Tools:
                         source_uri = attribute.get('Value', {}).get('StringValue', '')
 
             if source_uri:
-                print(f"Amazon Kendra Source URI: {source_uri}")
                 item['_source_uri'] = source_uri
 
         return modified_response
@@ -60,10 +59,11 @@ class Tools:
         """
         Generates an answer for the user based on the Kendra response.
         """
-        prompt_data = f"""\n\nHuman:
-        Imagine you are First American Home Warranty's AI assistant responding to a consumer user. You respond quickly and friendly to questions from a user, providing both an answer and the sources used to find that answer.
+        prompt_data = f"""
+        Human:
+        Imagine you are First American Home Warranty's AI assistant. You respond quickly and friendly to questions from a user, providing both an answer and the sources used to find that answer.
 
-        Format your response for optimal human readability and do not reference the context,
+        Format your response for enhanced human readability.
 
         At the end of your response, include the relevant sources if information from specific sources was used in your response. Use the following format for each of the sources used: [Source #: Source Title - Source Link].
 
@@ -73,7 +73,8 @@ class Tools:
 
         Context: {context}
 
-        \n\nAssistant:"""
+        \n\nAssistant:
+        """
 
         # Formatting the prompt as a JSON string
         json_prompt = json.dumps({
