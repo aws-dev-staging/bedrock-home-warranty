@@ -142,14 +142,14 @@ Resources:
     Properties:
       TableName: !Sub ${AWS::StackName}-ClaimsTable
       AttributeDefinitions:
-      - AttributeName: ClaimId
-        AttributeType: S
       - AttributeName: PolicyId
+        AttributeType: S
+      - AttributeName: ClaimId
         AttributeType: S
       KeySchema:
-      - AttributeName: ClaimId
-        KeyType: HASH
       - AttributeName: PolicyId
+        KeyType: HASH
+      - AttributeName: ClaimId
         KeyType: RANGE
       ProvisionedThroughput:
         ReadCapacityUnits: 3
