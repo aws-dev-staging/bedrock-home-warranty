@@ -4,9 +4,11 @@ import json
 import time
 import boto3
 import pdfrw
+import string
+import random
 import difflib
 import datetime
-# import dateparser
+import dateparser
 
 from chat import Chat
 from boto3.dynamodb.conditions import Key
@@ -26,6 +28,7 @@ dynamodb = boto3.resource('dynamodb',region_name=os.environ['AWS_REGION'])
 s3_client = boto3.client('s3',region_name=os.environ['AWS_REGION'],config=boto3.session.Config(signature_version='s3v4',))
 s3_object = boto3.resource('s3')
 bedrock_client = boto3_session.client(service_name="bedrock-runtime")
+agent_runtime_client = boto3_session.client('bedrock-agent-runtime')
 
 # --- Lex v2 request/response helpers (https://docs.aws.amazon.com/lexv2/latest/dg/lambda-response-format.html) ---
 
@@ -383,6 +386,7 @@ def verify_identity(intent_request):
                     if policy_id:
                         session_attributes['PolicyId'] = policy_id
                         build_slot(intent_request, 'PolicyId', policy_id)
+                        print(f"verify_identity session_attributes: {session_attributes}")
                         message_parts.append(f"Your home warranty policy ID is {policy_id}.")
 
                     if plan_type and property_type and property_value:
@@ -607,7 +611,7 @@ def validate_home_warranty_quote(intent_request, slots):
                 'When would you like your policy to end?'
             )
 
-        '''start_date = dateparser.parse(policy_start_date)
+        start_date = dateparser.parse(policy_start_date)
         end_date = dateparser.parse(policy_end_date)
         print(f"start_date: {start_date}; end_date: {end_date}")
 
@@ -623,7 +627,7 @@ def validate_home_warranty_quote(intent_request, slots):
                 False,
                 'PolicyEndDate',
                 'Policy end date must be at least 30 days after the start date. Please enter a valid end date.'
-            )'''
+            )
 
     return {'isValid': True}
 
@@ -765,14 +769,18 @@ def summarize_claims(intent_request):
     """
     slots = intent_request['sessionState']['intent']['slots']
     session_attributes = intent_request['sessionState'].get("sessionAttributes") or {}
+    intent = intent_request['sessionState']['intent']
+    active_contexts = {}
 
     # Retrieve slot values, check session attributes first
     username = try_ex(slots.get('UserName')) or session_attributes.get('UserName')
     policy_id = try_ex(slots.get('PolicyId')) or session_attributes.get('PolicyId')
 
+    print(f"summarize_claims - session_attributes: {session_attributes}; username: {username}; policy_id: {policy_id}")
+
    # Validate the slot values
     if not policy_id:
-        return elicit_slot(intent_request, session_attributes, 'PolicyId', 'Please provide your policy ID.')
+        return elicit_slot(session_attributes, active_contexts, intent, 'PolicyId', 'Please provide your policy ID.')
 
     claims_table = dynamodb.Table(claims_table_name)
 
@@ -795,6 +803,75 @@ def summarize_claims(intent_request):
     except Exception as e:
         print(f"Error summarizing claims: {e}")
         return str(e)
+
+
+def generate_session_id():
+    return ''.join(random.choices(string.digits, k=5))
+
+
+def bedrock_agent(intent_request):
+    session_attributes = intent_request['sessionState'].get("sessionAttributes") or {}
+    query = intent_request['inputTranscript']
+    print(f"Bedrock Agent query: {query}")
+    
+    agent_alias_id = "TSTALIASID"
+    agent_id = "U8TWVNTXPJ"
+
+    # Check if session_id exists in session_attributes, if not generate a new one
+    session_id = session_attributes.get("SessionId")
+    if not session_id:
+        session_id = generate_session_id()
+        session_attributes["SessionId"] = session_id
+
+    try:    
+        # Build the parameters for the invoke_agent call
+        params = {
+            'agentAliasId': agent_alias_id,
+            'agentId': agent_id,
+            'sessionId': session_id,
+            'inputText': query,
+            'enableTrace': True
+        }
+        
+        print("### HERE ###")
+        # Invoke the agent
+        response = agent_runtime_client.invoke_agent(**params)
+        print(f"bedrock_agent response: {response}")
+        
+        # Handle the response (this is a simplification, adjust as needed for your use case)
+        for event in response['completion']:
+            if 'chunk' in event:
+                result_bytes = event['chunk']['bytes']
+                result_text = result_bytes.decode('utf-8')
+                print(f"Bedrock Agent response: {result_text}\n")
+
+    except Exception as e:
+        result_text = f"Error invoking agent: {e}"
+
+    return elicit_intent(intent_request, session_attributes, result_text)
+
+
+def place_outgoing_call(intent_request):
+    # Initialize a boto3 client for Amazon Connect
+    connect_client = boto3.client('connect', region_name='us-east-1')  # Replace with your region
+    source_phone_number = "+16592752503"
+    dest_phone_number = "+16197090050"
+    contact_flow_id = "b3d8f450-edaf-414f-84f9-eff47f96e4b3"
+    connect_instance_id = "17f44713-b8ff-42cf-aa32-e86750cc6305"
+    session_attributes = intent_request['sessionState'].get("sessionAttributes") or {}
+    print(f"place_outgoing_call session_attributes: {session_attributes}")
+
+    try:
+        response = connect_client.start_outbound_voice_contact(
+            SourcePhoneNumber=source_phone_number,
+            DestinationPhoneNumber=dest_phone_number,
+            ContactFlowId=contact_flow_id,
+            InstanceId=connect_instance_id,
+            Attributes=session_attributes,
+        )
+        print(f"Call initiated successfully: {response}")
+    except Exception as e:
+        print(f"Failed to place call: {e}")
 
 
 def invoke_agent(prompt, session_id):
@@ -841,12 +918,31 @@ def dispatch(intent_request):
     username = slots['UserName'] if 'UserName' in slots else None
     intent_name = intent_request['sessionState']['intent']['name']
 
+    session_attributes = intent_request['sessionState'].get("sessionAttributes") or {}
+    contact_attributes = intent_request['requestAttributes'] if 'requestAttributes' in intent_request else {}
+
+    print(f"Dispatch Session Attributes: {session_attributes}")
+    print(f"Dispatch Contact Attributes: {contact_attributes}")
+
+    user_name = contact_attributes.get('UserName', session_attributes.get('UserName', ''))
+    policy_id = contact_attributes.get('PolicyId', session_attributes.get('PolicyId', ''))
+
+    print(f"UserName: {user_name}")
+    print(f"PolicyId: {policy_id}")
+
+    # Log the event for debugging purposes
+    # print("Received event: " + json.dumps(intent_request, indent=2))
+
     if intent_name == 'VerifyIdentity':
         return verify_identity(intent_request)
     elif intent_name == 'HomeWarrantyQuote':
         return generate_home_warranty_quote(intent_request)
     elif intent_name == 'SummarizeClaims':
         return summarize_claims(intent_request)
+    elif intent_name == 'BedrockAgent':
+        return bedrock_agent(intent_request)
+    elif intent_name == 'OutboundContact':
+        return place_outgoing_call(intent_request)
     else:
         return genai_intent(intent_request)
 
@@ -861,6 +957,14 @@ def handler(event, context):
     """
     os.environ['TZ'] = 'America/New_York'
     time.tzset()
+
+    contact_id = event.get('contactId')
+    instance_id = event.get('instanceId')
+    attributes = event.get('attributes', {})
+    parameters = event.get('parameters', {})
+
+    # Example of accessing a specific parameter
+    print(f"contact_id: {contact_id}; parameters: {parameters}")
 
     return dispatch(event)
 

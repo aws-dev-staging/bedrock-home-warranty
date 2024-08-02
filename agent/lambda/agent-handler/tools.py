@@ -59,22 +59,19 @@ class Tools:
         """
         Generates an answer for the user based on the Kendra response.
         """
-        prompt_data = f"""
-        Human:
-        Imagine you are First American Home Warranty's AI assistant. You respond quickly and friendly to questions from a user, providing both an answer and the sources used to find that answer.
+        prompt_data = f"""\n\nHuman:
+        Imagine you are First American Home Warranty's AI Assistant. You respond quickly and friendly to questions from a user, providing both an answer and the sources used to find that answer.
 
-        Format your response for enhanced human readability.
-
-        At the end of your response, include the relevant sources if information from specific sources was used in your response. Use the following format for each of the sources used: [Source #: Source Title - Source Link].
+        Format your response for enhanced human readability, using emojis where appropriate. At the end of your response, include the relevant sources if information from specific sources was used in your response. Use the following format for each of the sources used: [Source #: Source Title - Source Link].
 
         Using the following context, answer the following question to the best of your ability. Do not include information that is not relevant to the question, and only provide information based on the context provided without making assumptions. 
+
+        Do not mention the context and treat each response like it is a continuation of the conversation, so you do not need to greet the user each time.
 
         Question: {question}
 
         Context: {context}
-
-        \n\nAssistant:
-        """
+        \n\nAssistant: """
 
         # Formatting the prompt as a JSON string
         json_prompt = json.dumps({
